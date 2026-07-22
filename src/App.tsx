@@ -42,7 +42,12 @@ import {
   orderOpportunities,
 } from './demo/demoOperations';
 import { type AppState, createInitialState } from './persistence/appState';
-import { loadState, saveState } from './persistence/storage';
+import {
+  clearState,
+  loadState,
+  saveState,
+  type LoadResult,
+} from './persistence/storage';
 import {
   SESSION_KEY,
   authenticate,
@@ -72,9 +77,10 @@ const theme = createTheme({
   },
 });
 
-function getInitialData(): AppState {
-  if (typeof window === 'undefined') return createInitialState();
-  return loadState(window.localStorage).state;
+function getInitialLoad(): LoadResult {
+  if (typeof window === 'undefined')
+    return { status: 'persistent', state: createInitialState() };
+  return loadState(window.localStorage);
 }
 
 function getInitialSession(): SessionState {
@@ -84,7 +90,11 @@ function getInitialSession(): SessionState {
 }
 
 export function App() {
-  const [data, setData] = useState(getInitialData);
+  const [initialLoad] = useState(getInitialLoad);
+  const [data, setData] = useState(initialLoad.state);
+  const [storageNotice, setStorageNotice] = useState(
+    initialLoad.status === 'persistent' ? '' : initialLoad.message,
+  );
   const [session, setSession] = useState(getInitialSession);
   const [view, setView] = useState<'Active' | 'Closed'>('Active');
   const [username, setUsername] = useState('');
@@ -119,6 +129,17 @@ export function App() {
     }
     setData(next);
     return true;
+  }
+
+  function resetCorruptedData() {
+    const result = clearState(localStorage);
+    if (!result.ok) {
+      setStorageNotice(result.message);
+      return;
+    }
+    setData(createInitialState());
+    setStorageNotice('');
+    setFeedback('Application data reset.');
   }
 
   function addAudit(action: 'login' | 'logout' | 'role_switch', roles = {}) {
@@ -280,6 +301,23 @@ export function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
+      {storageNotice && (
+        <Alert
+          severity={
+            initialLoad.status === 'recovery-required' ? 'error' : 'warning'
+          }
+          action={
+            initialLoad.status === 'recovery-required' ? (
+              <Button color="inherit" onClick={resetCorruptedData}>
+                Reset application data
+              </Button>
+            ) : undefined
+          }
+          sx={{ borderRadius: 0 }}
+        >
+          {storageNotice}
+        </Alert>
+      )}
       {session.authenticated ? (
         <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
           <AppBar position="static" elevation={0}>
