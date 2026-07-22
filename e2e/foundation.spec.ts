@@ -18,6 +18,10 @@ test('logs in and uses the primary shell', async ({ page }) => {
   await page.getByRole('checkbox', { name: /assign to me/i }).check();
   await page.getByRole('button', { name: /create opportunity/i }).click();
   await expect(page.getByText('OPP-0001', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /^move OPP-0001$/i }).click();
+  await expect(
+    page.getByRole('dialog', { name: /opportunity details/i }),
+  ).toBeHidden();
   await page
     .getByRole('button', { name: /open OPP-0001: Reduce packing waste/i })
     .click();
