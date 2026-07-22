@@ -1,4 +1,17 @@
 import AddIcon from '@mui/icons-material/Add';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
 import {
   Alert,
   Box,
@@ -25,16 +38,20 @@ import { type FormEvent, useMemo, useState } from 'react';
 import {
   compareByDefaultOrder,
   createOpportunity,
+  availableTransitions,
   OPPORTUNITY_STATUSES,
   type NewOpportunityInput,
   type Opportunity,
   type OpportunityStatus,
   type Priority,
+  type Role,
   type ValidationIssue,
   validateNewOpportunity,
 } from '../domain/opportunity';
+import { orderOpportunities } from '../demo/demoOperations';
 
 const CLOSED_STATUSES: ReadonlySet<OpportunityStatus> = new Set([
+  'Complete',
   'Archived',
   'Canceled',
   'Rejected',
@@ -47,6 +64,142 @@ interface Props {
   onCreate: (opportunity: Opportunity) => void;
   onFeedback: (message: string) => void;
   onSelect: (opportunity: Opportunity, opener: HTMLElement) => void;
+  role: Role;
+  customOrder: Partial<Record<OpportunityStatus, string[]>>;
+  onMove: (opportunity: Opportunity, status: OpportunityStatus) => void;
+  onReorder: (status: OpportunityStatus, id: string, offset: -1 | 1) => void;
+}
+
+function DropColumn({
+  status,
+  disabled,
+  children,
+}: {
+  status: OpportunityStatus;
+  disabled: boolean;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: status, disabled });
+  return (
+    <Box
+      ref={setNodeRef}
+      aria-disabled={disabled || undefined}
+      sx={{
+        bgcolor: isOver ? '#c6e3df' : '#dfe8ea',
+        border: disabled ? '2px dashed #87979b' : '2px solid transparent',
+        borderRadius: 2,
+        p: 2,
+        minHeight: 180,
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+function DraggableCard({
+  item,
+  highlighted,
+  role,
+  index,
+  count,
+  onSelect,
+  onReorder,
+}: {
+  item: Opportunity;
+  highlighted: boolean;
+  role: Role;
+  index: number;
+  count: number;
+  onSelect: Props['onSelect'];
+  onReorder: Props['onReorder'];
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({ id: item.id });
+  return (
+    <Card
+      ref={setNodeRef}
+      variant="outlined"
+      sx={{
+        ...(highlighted ? { outline: '3px solid #b45309' } : {}),
+        opacity: isDragging ? 0.55 : 1,
+        transform: transform
+          ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
+          : undefined,
+      }}
+    >
+      <CardContent>
+        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+          <Button
+            aria-label={`Move ${item.id} by drag and drop`}
+            size="small"
+            {...listeners}
+            {...attributes}
+            sx={{ minWidth: 44 }}
+          >
+            <DragIndicatorIcon />
+          </Button>
+          {role === 'Manager' && (
+            <>
+              <Button
+                aria-label={`Move ${item.id} up`}
+                disabled={index === 0}
+                onClick={() => onReorder(item.status, item.id, -1)}
+                sx={{ minWidth: 44 }}
+              >
+                <ArrowUpwardIcon />
+              </Button>
+              <Button
+                aria-label={`Move ${item.id} down`}
+                disabled={index === count - 1}
+                onClick={() => onReorder(item.status, item.id, 1)}
+                sx={{ minWidth: 44 }}
+              >
+                <ArrowDownwardIcon />
+              </Button>
+            </>
+          )}
+        </Stack>
+        <Box
+          component="button"
+          type="button"
+          onClick={(event) => onSelect(item, event.currentTarget)}
+          aria-label={`Open ${item.id}: ${item.title}`}
+          sx={{
+            width: '100%',
+            textAlign: 'left',
+            border: 0,
+            bgcolor: 'transparent',
+            cursor: 'pointer',
+            p: 0,
+          }}
+        >
+          <Stack
+            direction="row"
+            sx={{ justifyContent: 'space-between', gap: 1 }}
+          >
+            <Typography variant="caption" sx={{ fontWeight: 800 }}>
+              {item.id}
+            </Typography>
+            <Chip
+              label={item.priority}
+              size="small"
+              color={item.priority === 'High' ? 'error' : 'default'}
+            />
+          </Stack>
+          <Typography component="h3" sx={{ mt: 1, fontWeight: 800 }}>
+            {item.title}
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            {item.description}
+          </Typography>
+          <Typography variant="caption" sx={{ mt: 1.5, display: 'block' }}>
+            Submitted by {item.submitterName}
+          </Typography>
+        </Box>
+      </CardContent>
+    </Card>
+  );
 }
 
 const EMPTY_FORM: NewOpportunityInput = {
@@ -63,6 +216,10 @@ export function OpportunityBoard({
   onCreate,
   onFeedback,
   onSelect,
+  role,
+  customOrder,
+  onMove,
+  onReorder,
 }: Props) {
   const [query, setQuery] = useState('');
   const [priority, setPriority] = useState<Priority | 'All'>('All');
@@ -71,6 +228,11 @@ export function OpportunityBoard({
   const [issues, setIssues] = useState<ValidationIssue[]>([]);
   const [highlightedId, setHighlightedId] = useState('');
   const [assignToMe, setAssignToMe] = useState(false);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor),
+  );
 
   const statuses = OPPORTUNITY_STATUSES.filter((status) =>
     view === 'Closed'
@@ -128,6 +290,16 @@ export function OpportunityBoard({
     return issues.find((issue) => issue.field === field)?.message;
   }
 
+  function finishDrag(event: DragEndEvent) {
+    const opportunity = opportunities.find(
+      (item) => item.id === event.active.id,
+    );
+    const status = OPPORTUNITY_STATUSES.find((item) => item === event.over?.id);
+    setDraggedId(null);
+    if (opportunity && status && opportunity.status !== status)
+      onMove(opportunity, status);
+  }
+
   return (
     <Stack spacing={3}>
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
@@ -173,122 +345,85 @@ export function OpportunityBoard({
           No opportunities match the current filters.
         </Alert>
       ) : (
-        <Box
-          aria-label={`${view} opportunity board`}
-          sx={{
-            display: 'grid',
-            gridTemplateColumns: {
-              xs: '1fr',
-              lg: `repeat(${Math.min(statuses.length, 3)}, minmax(260px, 1fr))`,
-            },
-            gap: 2,
-          }}
+        <DndContext
+          sensors={sensors}
+          onDragStart={(event) => setDraggedId(String(event.active.id))}
+          onDragCancel={() => setDraggedId(null)}
+          onDragEnd={finishDrag}
         >
-          {statuses.map((status) => {
-            const items = filtered.filter((item) => item.status === status);
-            return (
-              <Box
-                component="section"
-                aria-labelledby={`column-${status}`}
-                key={status}
-                sx={{
-                  bgcolor: '#dfe8ea',
-                  borderRadius: 2,
-                  p: 2,
-                  minHeight: 180,
-                }}
-              >
-                <Stack
-                  direction="row"
-                  sx={{ justifyContent: 'space-between', alignItems: 'center' }}
+          <Box
+            aria-label={`${view} opportunity board`}
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: '1fr',
+                lg: `repeat(${Math.min(statuses.length, 3)}, minmax(260px, 1fr))`,
+              },
+              gap: 2,
+            }}
+          >
+            {statuses.map((status) => {
+              const items = orderOpportunities(
+                filtered.filter((item) => item.status === status),
+                customOrder[status],
+              );
+              const dragged = opportunities.find(
+                (item) => item.id === draggedId,
+              );
+              const validTarget =
+                !dragged ||
+                dragged.status === status ||
+                availableTransitions(dragged, role).includes(status);
+              return (
+                <DropColumn
+                  key={status}
+                  status={status}
+                  disabled={!validTarget}
                 >
-                  <Typography
-                    id={`column-${status}`}
-                    component="h2"
-                    variant="h6"
+                  <Stack
+                    direction="row"
+                    sx={{
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
                   >
-                    {status}
-                  </Typography>
-                  <Chip
-                    label={items.length}
-                    size="small"
-                    aria-label={`${items.length} ${status} opportunities`}
-                  />
-                </Stack>
-                <Stack spacing={1.5} sx={{ mt: 2 }}>
-                  {items.length === 0 && (
-                    <Typography color="text.secondary">
-                      No opportunities
-                    </Typography>
-                  )}
-                  {items.map((item) => (
-                    <Card
-                      key={item.id}
-                      variant="outlined"
-                      sx={
-                        item.id === highlightedId
-                          ? { outline: '3px solid #b45309' }
-                          : undefined
-                      }
+                    <Typography
+                      id={`column-${status}`}
+                      component="h2"
+                      variant="h6"
                     >
-                      <CardContent
-                        component="button"
-                        type="button"
-                        onClick={(event) => onSelect(item, event.currentTarget)}
-                        aria-label={`Open ${item.id}: ${item.title}`}
-                        sx={{
-                          width: '100%',
-                          textAlign: 'left',
-                          border: 0,
-                          bgcolor: 'transparent',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        <Stack
-                          direction="row"
-                          sx={{ justifyContent: 'space-between', gap: 1 }}
-                        >
-                          <Typography
-                            variant="caption"
-                            sx={{ fontWeight: 800 }}
-                          >
-                            {item.id}
-                          </Typography>
-                          <Chip
-                            label={item.priority}
-                            size="small"
-                            color={
-                              item.priority === 'High' ? 'error' : 'default'
-                            }
-                          />
-                        </Stack>
-                        <Typography
-                          component="h3"
-                          sx={{ mt: 1, fontWeight: 800 }}
-                        >
-                          {item.title}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                          sx={{ mt: 1 }}
-                        >
-                          {item.description}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{ mt: 1.5, display: 'block' }}
-                        >
-                          Submitted by {item.submitterName}
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </Stack>
-              </Box>
-            );
-          })}
-        </Box>
+                      {status}
+                    </Typography>
+                    <Chip
+                      label={items.length}
+                      size="small"
+                      aria-label={`${items.length} ${status} opportunities`}
+                    />
+                  </Stack>
+                  <Stack spacing={1.5} sx={{ mt: 2 }}>
+                    {items.length === 0 && (
+                      <Typography color="text.secondary">
+                        No opportunities
+                      </Typography>
+                    )}
+                    {items.map((item, index) => (
+                      <DraggableCard
+                        key={item.id}
+                        item={item}
+                        highlighted={item.id === highlightedId}
+                        role={role}
+                        index={index}
+                        count={items.length}
+                        onSelect={onSelect}
+                        onReorder={onReorder}
+                      />
+                    ))}
+                  </Stack>
+                </DropColumn>
+              );
+            })}
+          </Box>
+        </DndContext>
       )}
 
       <Dialog
