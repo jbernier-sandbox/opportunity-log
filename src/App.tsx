@@ -3,6 +3,8 @@ import CloseIcon from '@mui/icons-material/Close';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import {
   Alert,
   AppBar,
@@ -115,8 +117,10 @@ export function App() {
   const [moveReason, setMoveReason] = useState('');
   const [moveError, setMoveError] = useState('');
   const [fullscreen, setFullscreen] = useState(false);
+  const [controlsExpanded, setControlsExpanded] = useState(true);
   const detailsOpener = useRef<HTMLElement | null>(null);
-  const boardHeading = useRef<HTMLHeadingElement | null>(null);
+  const activeViewButton = useRef<HTMLButtonElement | null>(null);
+  const closedViewButton = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (session.authenticated)
@@ -362,7 +366,11 @@ export function App() {
     setSelectedId(null);
     window.setTimeout(() => {
       if (detailsOpener.current?.isConnected) detailsOpener.current.focus();
-      else boardHeading.current?.focus();
+      else
+        (view === 'Active'
+          ? activeViewButton.current
+          : closedViewButton.current
+        )?.focus();
     }, 0);
   }
 
@@ -400,29 +408,32 @@ export function App() {
               >
                 Opportunity Log
               </Typography>
-              <Typography variant="caption" sx={{ maxWidth: 190 }}>
-                Monarch Prototype brought to you by Jonathan Bernier
-              </Typography>
               <ButtonGroup
                 aria-label="Opportunity view"
                 size="small"
                 sx={{ bgcolor: 'white' }}
               >
                 <Button
+                  ref={activeViewButton}
                   aria-pressed={view === 'Active'}
+                  aria-current={view === 'Active' ? 'page' : undefined}
+                  variant={view === 'Active' ? 'contained' : 'outlined'}
                   onClick={() => setView('Active')}
                 >
                   Active opportunities
                 </Button>
                 <Button
+                  ref={closedViewButton}
                   aria-pressed={view === 'Closed'}
+                  aria-current={view === 'Closed' ? 'page' : undefined}
+                  variant={view === 'Closed' ? 'contained' : 'outlined'}
                   onClick={() => setView('Closed')}
                 >
                   Closed opportunities
                 </Button>
               </ButtonGroup>
               <Box sx={{ flexGrow: 1 }} />
-              {session.role === 'Manager' && (
+              {controlsExpanded && session.role === 'Manager' && (
                 <>
                   <Button color="inherit" onClick={loadSamples}>
                     Load sample data
@@ -436,25 +447,32 @@ export function App() {
                 </>
               )}
               <Stack spacing={0} sx={{ textAlign: 'right' }}>
-                <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                  Alex Morgan
-                </Typography>
+                {controlsExpanded && (
+                  <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                    Alex Morgan
+                  </Typography>
+                )}
                 <Typography variant="caption">{session.role}</Typography>
               </Stack>
-              <Button
-                color="inherit"
-                variant="outlined"
-                onClick={() => setRoleDialog(true)}
-              >
-                Switch to {session.role === 'Employee' ? 'Manager' : 'Employee'}
-              </Button>
-              <IconButton
-                color="inherit"
-                aria-label="Help"
-                onClick={() => setHelpOpen(true)}
-              >
-                <HelpOutlineIcon />
-              </IconButton>
+              {controlsExpanded && (
+                <>
+                  <Button
+                    color="inherit"
+                    variant="outlined"
+                    onClick={() => setRoleDialog(true)}
+                  >
+                    Switch to{' '}
+                    {session.role === 'Employee' ? 'Manager' : 'Employee'}
+                  </Button>
+                  <IconButton
+                    color="inherit"
+                    aria-label="Help"
+                    onClick={() => setHelpOpen(true)}
+                  >
+                    <HelpOutlineIcon />
+                  </IconButton>
+                </>
+              )}
               <IconButton
                 color="inherit"
                 aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
@@ -462,8 +480,21 @@ export function App() {
               >
                 {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
               </IconButton>
-              <Button color="inherit" onClick={logout}>
-                Log out
+              {controlsExpanded && (
+                <Button color="inherit" onClick={logout}>
+                  Log out
+                </Button>
+              )}
+              <Button
+                color="inherit"
+                aria-expanded={controlsExpanded}
+                aria-controls="board-controls"
+                startIcon={
+                  controlsExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />
+                }
+                onClick={() => setControlsExpanded((expanded) => !expanded)}
+              >
+                {controlsExpanded ? 'Collapse' : 'Expand'}
               </Button>
             </Toolbar>
           </AppBar>
@@ -472,16 +503,7 @@ export function App() {
             maxWidth={false}
             sx={{ py: 2, px: { xs: 1, md: 2 } }}
           >
-            <Typography
-              ref={boardHeading}
-              tabIndex={-1}
-              component="h1"
-              variant="h1"
-              color="primary.dark"
-            >
-              {view} opportunities
-            </Typography>
-            <Box sx={{ mt: 3 }}>
+            <Box id="board-controls" sx={{ mt: controlsExpanded ? 0 : 0.5 }}>
               <OpportunityBoard
                 opportunities={data.opportunities}
                 view={view}
@@ -496,6 +518,7 @@ export function App() {
                 onReorderDrop={reorderOpportunityByDrop}
                 managerAssigneeFilter={data.preferences.managerAssigneeFilter}
                 employeeMyWork={data.preferences.employeeMyWork}
+                controlsExpanded={controlsExpanded}
                 onManagerAssigneeFilterChange={(managerAssigneeFilter) =>
                   persist({
                     ...data,
@@ -623,11 +646,14 @@ export function App() {
                   Filters and display
                 </Typography>
                 <Typography>
-                  Employee mode starts with My Work and can toggle to Show All.
-                  Manager mode can filter by any employee or Unassigned. Each
-                  mode remembers its filter. Use the header fullscreen control
-                  for a floor display; use it again or press Escape to exit.
-                  Empty status columns remain visible.
+                  Employee mode starts filtered to Alex and offers Show All;
+                  when all work is visible, My Work reapplies Alex's filter.
+                  Show All also clears the other Employee filters. Manager mode
+                  can filter by any employee or Unassigned. Each mode remembers
+                  its employee filter. Collapse the header controls to retain
+                  only Opportunity Log, Active/Closed, role, Fullscreen, and
+                  Expand. Use fullscreen again or press Escape to exit. Empty
+                  status columns remain visible.
                 </Typography>
                 <Typography component="h3" variant="h6">
                   Notes and activity
