@@ -29,7 +29,11 @@ export interface AppState {
   auditEvents: AuditEvent[];
   nextOpportunitySequence: number;
   customOrder: Partial<Record<OpportunityStatus, string[]>>;
-  preferences: { welcomeDismissed: boolean };
+  preferences: {
+    welcomeDismissed: boolean;
+    managerAssigneeFilter: string;
+    employeeMyWork: boolean;
+  };
 }
 
 export function createInitialState(): AppState {
@@ -39,7 +43,11 @@ export function createInitialState(): AppState {
     auditEvents: [],
     nextOpportunitySequence: 1,
     customOrder: {},
-    preferences: { welcomeDismissed: false },
+    preferences: {
+      welcomeDismissed: false,
+      managerAssigneeFilter: 'All Employees',
+      employeeMyWork: true,
+    },
   };
 }
 
