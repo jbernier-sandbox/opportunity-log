@@ -118,6 +118,12 @@ describe('opportunity domain', () => {
     ).toBe(true);
     expect(
       canTransition(
+        opportunity({ status: 'Complete', assignee: 'Alex Morgan' }),
+        'Canceled',
+      ),
+    ).toBe(true);
+    expect(
+      canTransition(
         opportunity({ status: 'Archived', assignee: 'Alex Morgan' }),
         'New',
       ),
