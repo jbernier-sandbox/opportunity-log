@@ -3,11 +3,14 @@
 Opportunity Log is a frontend-only continuous-improvement workflow prototype built for a
 touch-friendly shop-floor experience.
 
-## Phase 0 status
+## Implementation status
 
-The repository currently contains the tested application shell, strict TypeScript and linting,
+Phase 0 established the tested application shell, strict TypeScript and linting,
 unit/integration/accessibility and end-to-end test runners, GitHub Actions CI, and reproducible
-Netlify build configuration. Domain and feature behavior will be added incrementally using TDD.
+Netlify build configuration. Phase 1 adds the typed opportunity domain, workflow and permission
+rules, deterministic ordering, versioned browser persistence, corrupted-data recovery, storage
+capacity handling, and temporary-memory fallback. User-facing features are added incrementally
+using TDD.
 
 ## Requirements
 
