@@ -78,7 +78,7 @@ export function loadSampleData(
       {
         id: crypto.randomUUID(),
         action: 'sample_data_loaded',
-        actor: 'Manager',
+        actor: 'Alex Morgan',
         createdAt: now,
       },
     ],
@@ -100,12 +100,21 @@ export function moveInCustomOrder(
   id: string,
   offset: -1 | 1,
   role: Role,
+  visibleIds: string[] = ids,
 ): string[] {
   if (role !== 'Manager')
     throw new Error('Only managers may manually order cards.');
+  const visibleIndex = visibleIds.indexOf(id);
+  const visibleTarget = visibleIndex + offset;
+  if (
+    visibleIndex < 0 ||
+    visibleTarget < 0 ||
+    visibleTarget >= visibleIds.length
+  )
+    return ids;
   const index = ids.indexOf(id);
-  const target = index + offset;
-  if (index < 0 || target < 0 || target >= ids.length) return ids;
+  const target = ids.indexOf(visibleIds[visibleTarget] ?? '');
+  if (index < 0 || target < 0) return ids;
   const result = [...ids];
   const current = result[index];
   const replacement = result[target];
