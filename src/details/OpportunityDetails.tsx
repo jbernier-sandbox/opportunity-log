@@ -47,7 +47,7 @@ interface Props {
 function actionContext(role: Role): OpportunityActionContext {
   return {
     role,
-    actor: role === 'Employee' ? 'Alex Morgan' : 'Jamie Chen',
+    actor: 'Alex Morgan',
     now: new Date().toISOString(),
     entryId: crypto.randomUUID(),
   };
@@ -113,7 +113,7 @@ export function OpportunityDetails({
       () => assignOpportunity(opportunity!, assignee, actionContext(role)),
       assignee
         ? `Assigned to ${assignee}.`
-        : 'Assignment cleared. Workflow is locked until reassigned.',
+        : 'Assignment cleared and status returned to New.',
     );
   }
 
@@ -270,9 +270,13 @@ export function OpportunityDetails({
                 value={opportunity.assignee ?? ''}
                 onChange={(e) => changeAssignment(e.target.value)}
               >
-                <MenuItem value="">
-                  <em>Unassigned</em>
-                </MenuItem>
+                {['New', 'Assigned', 'Complete'].includes(
+                  opportunity.status,
+                ) && (
+                  <MenuItem value="">
+                    <em>Unassigned</em>
+                  </MenuItem>
+                )}
                 {ASSIGNEES.map((person) => (
                   <MenuItem key={person} value={person}>
                     {person}
