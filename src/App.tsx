@@ -24,9 +24,10 @@ import {
   Typography,
   createTheme,
 } from '@mui/material';
-import { type FormEvent, useEffect, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 
 import { OpportunityBoard } from './board/OpportunityBoard';
+import { OpportunityDetails } from './details/OpportunityDetails';
 import type { Opportunity } from './domain/opportunity';
 import type { Role } from './domain/opportunity';
 import { type AppState, createInitialState } from './persistence/appState';
@@ -81,6 +82,9 @@ export function App() {
   const [roleDialog, setRoleDialog] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const detailsOpener = useRef<HTMLElement | null>(null);
+  const boardHeading = useRef<HTMLHeadingElement | null>(null);
 
   useEffect(() => {
     if (session.authenticated)
@@ -149,6 +153,29 @@ export function App() {
     });
   }
 
+  function updateOpportunity(opportunity: Opportunity, message: string) {
+    persist({
+      ...data,
+      opportunities: data.opportunities.map((item) =>
+        item.id === opportunity.id ? opportunity : item,
+      ),
+    });
+    setFeedback(message);
+  }
+
+  function openDetails(opportunity: Opportunity, opener: HTMLElement) {
+    detailsOpener.current = opener;
+    setSelectedId(opportunity.id);
+  }
+
+  function closeDetails() {
+    setSelectedId(null);
+    window.setTimeout(() => {
+      if (detailsOpener.current?.isConnected) detailsOpener.current.focus();
+      else boardHeading.current?.focus();
+    }, 0);
+  }
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -211,7 +238,13 @@ export function App() {
             </Toolbar>
           </AppBar>
           <Container component="main" maxWidth="xl" sx={{ py: 5 }}>
-            <Typography component="h1" variant="h1" color="primary.dark">
+            <Typography
+              ref={boardHeading}
+              tabIndex={-1}
+              component="h1"
+              variant="h1"
+              color="primary.dark"
+            >
               {view} opportunities
             </Typography>
             <Box sx={{ mt: 3 }}>
@@ -221,6 +254,7 @@ export function App() {
                 nextSequence={data.nextOpportunitySequence}
                 onCreate={addOpportunity}
                 onFeedback={setFeedback}
+                onSelect={openDetails}
               />
             </Box>
           </Container>
@@ -337,6 +371,15 @@ export function App() {
             autoHideDuration={3000}
             onClose={() => setFeedback('')}
             message={feedback}
+          />
+          <OpportunityDetails
+            key={selectedId ?? 'no-selection'}
+            opportunity={
+              data.opportunities.find((item) => item.id === selectedId) ?? null
+            }
+            role={session.role}
+            onClose={closeDetails}
+            onUpdate={updateOpportunity}
           />
         </Box>
       ) : (

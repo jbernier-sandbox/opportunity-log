@@ -1,17 +1,28 @@
 import {
+  addOpportunityNote,
+  assignOpportunity,
+  availableTransitions,
   canAddNote,
   canEditCoreDetails,
   canEmployeeChangeStatus,
   canTransition,
   compareByDefaultOrder,
   createOpportunity,
+  editOpportunity,
   formatOpportunityId,
   requiresTransitionReason,
+  transitionOpportunity,
   validateNewOpportunity,
   type Opportunity,
 } from './opportunity';
 
 const NOW = '2026-07-22T15:00:00.000Z';
+const MANAGER = {
+  role: 'Manager',
+  actor: 'Jamie Chen',
+  now: NOW,
+  entryId: 'event-1',
+} as const;
 
 function opportunity(overrides: Partial<Opportunity> = {}): Opportunity {
   return {
@@ -163,5 +174,117 @@ describe('opportunity domain', () => {
     expect(
       items.sort(compareByDefaultOrder).map(({ sequence }) => sequence),
     ).toEqual([1, 2, 3]);
+  });
+
+  it('edits manager-controlled fields and records each changed value', () => {
+    const original = opportunity();
+    const result = editOpportunity(
+      original,
+      {
+        title: 'Safer lift station',
+        description: original.description,
+        priority: 'High',
+      },
+      MANAGER,
+    );
+    expect(result).toMatchObject({
+      title: 'Safer lift station',
+      priority: 'High',
+    });
+    expect(result.history[0]?.changes).toEqual([
+      {
+        field: 'title',
+        previousValue: 'Safer lift',
+        newValue: 'Safer lift station',
+      },
+      { field: 'priority', previousValue: 'Medium', newValue: 'High' },
+    ]);
+    expect(() =>
+      editOpportunity(
+        original,
+        { title: 'x', description: 'y', priority: 'Low' },
+        { ...MANAGER, role: 'Employee' },
+      ),
+    ).toThrow(/cannot be edited/i);
+    expect(original.title).toBe('Safer lift');
+  });
+
+  it('enforces manager assignment and narrow employee self-assignment', () => {
+    const original = opportunity();
+    expect(assignOpportunity(original, 'Priya Patel', MANAGER).assignee).toBe(
+      'Priya Patel',
+    );
+    expect(
+      assignOpportunity(original, 'Alex Morgan', {
+        ...MANAGER,
+        role: 'Employee',
+        actor: 'Alex Morgan',
+      }).assignee,
+    ).toBe('Alex Morgan');
+    expect(() =>
+      assignOpportunity(
+        opportunity({ status: 'Assigned', assignee: 'Jamie Chen' }),
+        'Alex Morgan',
+        { ...MANAGER, role: 'Employee', actor: 'Alex Morgan' },
+      ),
+    ).toThrow(/self-assign/i);
+    expect(() =>
+      assignOpportunity(opportunity({ status: 'Archived' }), null, MANAGER),
+    ).toThrow(/terminal/i);
+  });
+
+  it('adds append-only notes according to role, assignment, and terminal rules', () => {
+    const assigned = opportunity({ assignee: 'Alex Morgan' });
+    const employee = {
+      ...MANAGER,
+      role: 'Employee',
+      actor: 'Alex Morgan',
+    } as const;
+    expect(
+      addOpportunityNote(assigned, '  Checked clearance. ', employee).notes[0]
+        ?.body,
+    ).toBe('Checked clearance.');
+    expect(() => addOpportunityNote(opportunity(), 'Note', employee)).toThrow(
+      /cannot add/i,
+    );
+    expect(
+      addOpportunityNote(
+        opportunity({ status: 'Rejected' }),
+        'Manager follow-up',
+        MANAGER,
+      ).notes,
+    ).toHaveLength(1);
+    expect(() => addOpportunityNote(assigned, ' ', employee)).toThrow(
+      /required/i,
+    );
+  });
+
+  it('returns only role-valid transitions and requires cancel or reject reasons', () => {
+    const assigned = opportunity({
+      status: 'Assigned',
+      assignee: 'Alex Morgan',
+    });
+    expect(availableTransitions(assigned, 'Employee')).toEqual([
+      'Development',
+      'Canceled',
+      'Rejected',
+    ]);
+    expect(
+      availableTransitions({ ...assigned, assignee: 'Jamie Chen' }, 'Employee'),
+    ).toEqual([]);
+    expect(() =>
+      transitionOpportunity(assigned, 'Canceled', '', MANAGER),
+    ).toThrow(/reason is required/i);
+    const result = transitionOpportunity(
+      assigned,
+      'Canceled',
+      'No longer needed',
+      MANAGER,
+    );
+    expect(result.status).toBe('Canceled');
+    expect(result.history[0]).toMatchObject({
+      action: 'status_changed',
+      reason: 'No longer needed',
+    });
   });
 });

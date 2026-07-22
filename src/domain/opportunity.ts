@@ -45,6 +45,13 @@ export interface HistoryEntry {
   reason?: string;
 }
 
+export interface OpportunityActionContext {
+  role: Role;
+  actor: Assignee;
+  now: string;
+  entryId: string;
+}
+
 export interface Opportunity {
   id: string;
   sequence: number;
@@ -158,7 +165,10 @@ export function requiresTransitionReason(target: OpportunityStatus): boolean {
 }
 
 export function canEmployeeChangeStatus(opportunity: Opportunity): boolean {
-  return opportunity.assignee === 'Alex Morgan';
+  return (
+    opportunity.assignee === 'Alex Morgan' &&
+    !TERMINAL_STATUSES.has(opportunity.status)
+  );
 }
 
 export function canAddNote(opportunity: Opportunity, role: Role): boolean {
@@ -174,6 +184,158 @@ export function canEditCoreDetails(
   role: Role,
 ): boolean {
   return role === 'Manager' && !TERMINAL_STATUSES.has(opportunity.status);
+}
+
+export function availableTransitions(
+  opportunity: Opportunity,
+  role: Role,
+): readonly OpportunityStatus[] {
+  if (TERMINAL_STATUSES.has(opportunity.status)) return [];
+  if (role === 'Employee' && !canEmployeeChangeStatus(opportunity)) return [];
+  return TRANSITIONS[opportunity.status].filter((target) =>
+    canTransition(opportunity, target),
+  );
+}
+
+function historyEntry(
+  context: OpportunityActionContext,
+  entry: Omit<HistoryEntry, 'id' | 'actor' | 'role' | 'createdAt'>,
+): HistoryEntry {
+  return {
+    ...entry,
+    id: context.entryId,
+    actor: context.actor,
+    role: context.role,
+    createdAt: context.now,
+  };
+}
+
+function withHistory(
+  opportunity: Opportunity,
+  context: OpportunityActionContext,
+  entry: Omit<HistoryEntry, 'id' | 'actor' | 'role' | 'createdAt'>,
+  changes: Partial<Opportunity>,
+): Opportunity {
+  return {
+    ...opportunity,
+    ...changes,
+    updatedAt: context.now,
+    history: [...opportunity.history, historyEntry(context, entry)],
+  };
+}
+
+export function editOpportunity(
+  opportunity: Opportunity,
+  updates: Pick<Opportunity, 'title' | 'description' | 'priority'>,
+  context: OpportunityActionContext,
+): Opportunity {
+  if (!canEditCoreDetails(opportunity, context.role)) {
+    throw new Error('Core details cannot be edited for this opportunity.');
+  }
+  const title = updates.title.trim();
+  const description = updates.description.trim();
+  if (!title || !description || title.length > 120 || description.length > 2000)
+    throw new Error('Opportunity details are invalid.');
+  const next = { title, description, priority: updates.priority };
+  const changes = (Object.keys(next) as Array<keyof typeof next>)
+    .filter((field) => opportunity[field] !== next[field])
+    .map((field) => ({
+      field,
+      previousValue: opportunity[field],
+      newValue: next[field],
+    }));
+  if (!changes.length) return opportunity;
+  return withHistory(opportunity, context, { action: 'edited', changes }, next);
+}
+
+export function assignOpportunity(
+  opportunity: Opportunity,
+  assignee: Assignee | null,
+  context: OpportunityActionContext,
+): Opportunity {
+  if (TERMINAL_STATUSES.has(opportunity.status))
+    throw new Error('Terminal opportunities cannot be reassigned.');
+  if (context.role === 'Employee') {
+    if (
+      context.actor !== 'Alex Morgan' ||
+      opportunity.status !== 'New' ||
+      opportunity.assignee !== null ||
+      assignee !== 'Alex Morgan'
+    )
+      throw new Error(
+        'Employees may only self-assign an unassigned New opportunity.',
+      );
+  }
+  if (opportunity.assignee === assignee) return opportunity;
+  return withHistory(
+    opportunity,
+    context,
+    {
+      action: 'assigned',
+      changes: [
+        {
+          field: 'assignee',
+          previousValue: opportunity.assignee,
+          newValue: assignee,
+        },
+      ],
+    },
+    { assignee },
+  );
+}
+
+export function addOpportunityNote(
+  opportunity: Opportunity,
+  body: string,
+  context: OpportunityActionContext,
+): Opportunity {
+  if (!canAddNote(opportunity, context.role))
+    throw new Error('You cannot add a note to this opportunity.');
+  const trimmed = body.trim();
+  if (!trimmed) throw new Error('A note is required.');
+  return {
+    ...opportunity,
+    updatedAt: context.now,
+    notes: [
+      ...opportunity.notes,
+      {
+        id: context.entryId,
+        body: trimmed,
+        author: context.actor,
+        role: context.role,
+        createdAt: context.now,
+      },
+    ],
+  };
+}
+
+export function transitionOpportunity(
+  opportunity: Opportunity,
+  target: OpportunityStatus,
+  reason: string,
+  context: OpportunityActionContext,
+): Opportunity {
+  if (!availableTransitions(opportunity, context.role).includes(target))
+    throw new Error('This status transition is not permitted.');
+  const trimmedReason = reason.trim();
+  if (requiresTransitionReason(target) && !trimmedReason)
+    throw new Error('A reason is required for this outcome.');
+  return withHistory(
+    opportunity,
+    context,
+    {
+      action: 'status_changed',
+      changes: [
+        {
+          field: 'status',
+          previousValue: opportunity.status,
+          newValue: target,
+        },
+      ],
+      reason: trimmedReason || undefined,
+    },
+    { status: target },
+  );
 }
 
 const PRIORITY_RANK: Record<Priority, number> = { High: 0, Medium: 1, Low: 2 };
