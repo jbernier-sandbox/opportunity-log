@@ -145,7 +145,7 @@ const TRANSITIONS: Record<OpportunityStatus, readonly OpportunityStatus[]> = {
   Development: ['Pending Release', 'Canceled', 'Rejected'],
   'Pending Release': ['Released', 'Canceled', 'Rejected'],
   Released: ['Complete', 'Canceled', 'Rejected'],
-  Complete: ['Archived'],
+  Complete: ['Canceled', 'Rejected', 'Archived'],
   Canceled: [],
   Rejected: [],
   Archived: [],
