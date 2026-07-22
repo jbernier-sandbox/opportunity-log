@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('logs in and uses the primary shell', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('/');
 
   await expect(page).toHaveTitle('Opportunity Log');
@@ -50,4 +51,29 @@ test('logs in and uses the primary shell', async ({ page }) => {
     .getByRole('button', { name: /clear all data/i })
     .click();
   await expect(page.getByRole('dialog', { name: /welcome/i })).toBeVisible();
+});
+
+test('recovers corrupted data at a smaller landscape viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 600 });
+  await page.addInitScript({
+    content: "localStorage.setItem('opportunity-log:state', '{')",
+  });
+  await page.goto('/');
+
+  await expect(
+    page.getByText(/saved application data.*corrupted/i),
+  ).toBeVisible();
+  const reset = page.getByRole('button', { name: /reset application data/i });
+  await expect(reset).toBeVisible();
+  await expect(reset).toHaveCSS('min-height', '44px');
+  await reset.click();
+
+  await expect(
+    page.getByText(/saved application data.*corrupted/i),
+  ).toBeHidden();
+  await expect(
+    page.getByRole('heading', { name: /welcome back/i }),
+  ).toBeVisible();
 });
