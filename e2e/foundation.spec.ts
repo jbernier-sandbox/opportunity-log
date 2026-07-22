@@ -32,4 +32,18 @@ test('logs in and uses the primary shell', async ({ page }) => {
     .click();
   await page.getByRole('button', { name: /help/i }).click();
   await expect(page.getByRole('dialog', { name: /help/i })).toBeVisible();
+  await page.getByRole('button', { name: /close help/i }).click();
+  await page.getByRole('button', { name: /switch to manager/i }).click();
+  await page.getByRole('button', { name: /confirm switch/i }).click();
+  await page.getByRole('button', { name: /load sample data/i }).click();
+  await expect(page.getByText('Improve machine guarding')).toBeVisible();
+  await page.getByRole('button', { name: /audit log/i }).click();
+  await expect(page.getByText(/sample data loaded/i)).toBeVisible();
+  await page.getByRole('button', { name: /close audit log/i }).click();
+  await page.getByRole('button', { name: /clear all data/i }).click();
+  await page
+    .getByRole('dialog', { name: /clear all application data/i })
+    .getByRole('button', { name: /clear all data/i })
+    .click();
+  await expect(page.getByRole('dialog', { name: /welcome/i })).toBeVisible();
 });
