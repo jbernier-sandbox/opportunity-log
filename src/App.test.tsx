@@ -156,7 +156,7 @@ describe('login and application shell', () => {
     await closeRoleDialog(user, 'confirm');
     await user.click(screen.getByRole('button', { name: /log out/i }));
     expect(
-      screen.getByRole('heading', { name: /welcome back/i }),
+      screen.getByRole('heading', { name: /^welcome$/i }),
     ).toBeInTheDocument();
 
     await login();
@@ -197,6 +197,15 @@ describe('login and application shell', () => {
     await dismissWelcome(user);
 
     expect(screen.getByText(/no opportunities yet/i)).toBeInTheDocument();
+    for (const status of [
+      'New',
+      'Assigned',
+      'Development',
+      'Pending Release',
+      'Released',
+    ]) {
+      expect(screen.getByRole('heading', { name: status })).toBeInTheDocument();
+    }
     await user.click(screen.getByRole('button', { name: /new opportunity/i }));
     await user.clear(screen.getByLabelText(/submitter name/i));
     await user.click(
@@ -228,6 +237,35 @@ describe('login and application shell', () => {
     expect(screen.getByText(/no opportunities match/i)).toBeInTheDocument();
   });
 
+  it('explains when fullscreen is unavailable and leaves the app unchanged', async () => {
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ authenticated: true, role: 'Employee' }),
+    );
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...createInitialState(),
+        preferences: {
+          ...createInitialState().preferences,
+          welcomeDismissed: true,
+        },
+      }),
+    );
+    Object.defineProperty(document, 'fullscreenEnabled', {
+      configurable: true,
+      value: false,
+    });
+    render(<App />);
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: /enter fullscreen/i }));
+    expect(
+      screen.getByText(/fullscreen mode is not supported/i),
+    ).toBeInTheDocument();
+    expect(document.fullscreenElement).toBeFalsy();
+  });
+
   it('protects a dirty submission from accidental discard', async () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<App />);
@@ -247,6 +285,7 @@ describe('login and application shell', () => {
     seedOpportunity();
     render(<App />);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /my work/i }));
     const card = screen.getByRole('button', { name: /open OPP-0001/i });
     await user.click(card);
     expect(
@@ -259,15 +298,9 @@ describe('login and application shell', () => {
     );
     await user.click(screen.getByRole('button', { name: /^add note$/i }));
     expect(screen.getByText('Checked the work area.')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /move to assigned/i }));
-    const assignedDialog = screen.getByRole('dialog', {
-      name: /change status to assigned/i,
-    });
-    await user.click(
-      screen.getByRole('button', { name: /confirm status change/i }),
-    );
-    await waitForElementToBeRemoved(assignedDialog);
-    expect(screen.getByText(/status changed to assigned/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('dialog', { name: /opportunity details/i }),
+    ).toHaveTextContent(/status:\s*assigned/i);
     expect(localStorage.getItem(STORAGE_KEY)).toContain(
       'Checked the work area.',
     );
@@ -277,6 +310,7 @@ describe('login and application shell', () => {
     seedOpportunity();
     render(<App />);
     const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /my work/i }));
     const card = screen.getByRole('button', {
       name: /open OPP-0001: Safer lift/i,
     });
@@ -313,7 +347,9 @@ describe('login and application shell', () => {
     ).toBeInTheDocument();
     await user.click(screen.getByLabelText(/assignee/i));
     await user.click(screen.getByRole('option', { name: /unassigned/i }));
-    expect(screen.getByText(/workflow locked/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('dialog', { name: /opportunity details/i }),
+    ).toHaveTextContent(/status:\s*new/i);
     expect(
       screen.getByText(/title: Safer lift → Safer lift station/i),
     ).toBeInTheDocument();

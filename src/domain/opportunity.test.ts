@@ -239,6 +239,43 @@ describe('opportunity domain', () => {
     ).toThrow(/terminal/i);
   });
 
+  it('couples assignment and Assigned/New status with separate activity entries', () => {
+    const assigned = assignOpportunity(
+      opportunity({ status: 'New', assignee: null }),
+      'Priya Patel',
+      MANAGER,
+    );
+    expect(assigned.status).toBe('Assigned');
+    expect(assigned.history.slice(-2).map((entry) => entry.action)).toEqual([
+      'assigned',
+      'status_changed',
+    ]);
+
+    const cleared = assignOpportunity(assigned, null, {
+      ...MANAGER,
+      entryId: 'history-2',
+    });
+    expect(cleared.status).toBe('New');
+    expect(cleared.history.slice(-2).map((entry) => entry.action)).toEqual([
+      'assigned',
+      'status_changed',
+    ]);
+
+    for (const status of [
+      'Development',
+      'Pending Release',
+      'Released',
+    ] as const) {
+      expect(() =>
+        assignOpportunity(
+          opportunity({ status, assignee: 'Alex Morgan' }),
+          null,
+          MANAGER,
+        ),
+      ).toThrow(/cannot be unassigned/i);
+    }
+  });
+
   it('adds append-only notes according to role, assignment, and terminal rules', () => {
     const assigned = opportunity({ assignee: 'Alex Morgan' });
     const employee = {

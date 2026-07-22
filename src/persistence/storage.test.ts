@@ -1,3 +1,4 @@
+import { createOpportunity } from '../domain/opportunity';
 import { createInitialState, SCHEMA_VERSION } from './appState';
 import {
   clearState,
@@ -31,6 +32,53 @@ describe('versioned persistence', () => {
     const state = { ...createInitialState(), nextOpportunitySequence: 7 };
     expect(saveState(storage, state)).toEqual({ ok: true });
     expect(loadState(storage)).toEqual({ status: 'persistent', state });
+  });
+
+  it('migrates Jamie-authored actions to Alex without changing assignments', () => {
+    const storage = memoryStorage();
+    const state = createInitialState();
+    const item = createOpportunity(
+      { title: 'Labels', description: 'Improve labels', submitterName: 'Alex' },
+      1,
+      '2026-07-22T12:00:00.000Z',
+    );
+    item.assignee = 'Jamie Chen';
+    item.notes = [
+      {
+        id: 'n1',
+        body: 'Review',
+        author: 'Jamie Chen',
+        role: 'Manager',
+        createdAt: item.createdAt,
+      },
+    ];
+    item.history = [
+      {
+        id: 'h1',
+        action: 'edited',
+        actor: 'Jamie Chen',
+        role: 'Manager',
+        createdAt: item.createdAt,
+      },
+    ];
+    state.opportunities = [item];
+    state.auditEvents = [
+      {
+        id: 'a1',
+        action: 'login',
+        actor: 'Jamie Chen',
+        createdAt: item.createdAt,
+      },
+    ];
+    storage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+    const result = loadState(storage);
+    expect(result.state.opportunities[0]?.assignee).toBe('Jamie Chen');
+    expect(result.state.opportunities[0]?.notes[0]?.author).toBe('Alex Morgan');
+    expect(result.state.opportunities[0]?.history[0]?.actor).toBe(
+      'Alex Morgan',
+    );
+    expect(result.state.auditEvents[0]?.actor).toBe('Alex Morgan');
   });
 
   it.each([

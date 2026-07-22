@@ -1,6 +1,8 @@
 import AssignmentTurnedInOutlinedIcon from '@mui/icons-material/AssignmentTurnedInOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
+import FullscreenIcon from '@mui/icons-material/Fullscreen';
+import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
 import {
   Alert,
   AppBar,
@@ -112,6 +114,7 @@ export function App() {
   } | null>(null);
   const [moveReason, setMoveReason] = useState('');
   const [moveError, setMoveError] = useState('');
+  const [fullscreen, setFullscreen] = useState(false);
   const detailsOpener = useRef<HTMLElement | null>(null);
   const boardHeading = useRef<HTMLHeadingElement | null>(null);
 
@@ -120,6 +123,27 @@ export function App() {
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
     else localStorage.removeItem(SESSION_KEY);
   }, [session]);
+
+  useEffect(() => {
+    const update = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', update);
+    return () => document.removeEventListener('fullscreenchange', update);
+  }, []);
+
+  async function toggleFullscreen() {
+    try {
+      if (!document.fullscreenEnabled)
+        throw new Error('Fullscreen mode is not supported by this browser.');
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await document.documentElement.requestFullscreen();
+    } catch (error) {
+      setFeedback(
+        error instanceof Error
+          ? error.message
+          : 'Fullscreen mode could not be started. The display is unchanged.',
+      );
+    }
+  }
 
   function persist(next: AppState) {
     const result = saveState(localStorage, next);
@@ -269,6 +293,50 @@ export function App() {
     }
   }
 
+  function reorderOpportunityByDrop(
+    status: OpportunityStatus,
+    id: string,
+    visibleIds: string[],
+    targetId?: string,
+  ) {
+    const allIds = orderOpportunities(
+      data.opportunities.filter((item) => item.status === status),
+      data.customOrder[status],
+    ).map((item) => item.id);
+    let nextOrder = allIds;
+    const nextVisible = [...visibleIds];
+    const start = nextVisible.indexOf(id);
+    const target = targetId
+      ? nextVisible.indexOf(targetId)
+      : nextVisible.length - 1;
+    try {
+      if (start < 0 || target < 0 || start === target) return;
+      const offset = target > start ? 1 : -1;
+      for (let index = start; index !== target; index += offset) {
+        nextOrder = moveInCustomOrder(
+          nextOrder,
+          id,
+          offset,
+          session.role,
+          nextVisible,
+        );
+        const swap = nextVisible[index + offset];
+        if (!swap) break;
+        nextVisible[index] = swap;
+        nextVisible[index + offset] = id;
+      }
+      persist({
+        ...data,
+        customOrder: { ...data.customOrder, [status]: nextOrder },
+      });
+      setFeedback('Card order updated.');
+    } catch (error) {
+      setFeedback(
+        error instanceof Error ? error.message : 'Ordering was not permitted.',
+      );
+    }
+  }
+
   function loadSamples() {
     const next = loadSampleData(data, new Date().toISOString(), session.role);
     persist(next);
@@ -332,6 +400,9 @@ export function App() {
               >
                 Opportunity Log
               </Typography>
+              <Typography variant="caption" sx={{ maxWidth: 190 }}>
+                Monarch Prototype brought to you by Jonathan Bernier
+              </Typography>
               <ButtonGroup
                 aria-label="Opportunity view"
                 size="small"
@@ -384,12 +455,23 @@ export function App() {
               >
                 <HelpOutlineIcon />
               </IconButton>
+              <IconButton
+                color="inherit"
+                aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+                onClick={() => void toggleFullscreen()}
+              >
+                {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+              </IconButton>
               <Button color="inherit" onClick={logout}>
                 Log out
               </Button>
             </Toolbar>
           </AppBar>
-          <Container component="main" maxWidth="xl" sx={{ py: 5 }}>
+          <Container
+            component="main"
+            maxWidth={false}
+            sx={{ py: 2, px: { xs: 1, md: 2 } }}
+          >
             <Typography
               ref={boardHeading}
               tabIndex={-1}
@@ -411,6 +493,21 @@ export function App() {
                 customOrder={data.customOrder}
                 onMove={moveOpportunity}
                 onReorder={reorderOpportunity}
+                onReorderDrop={reorderOpportunityByDrop}
+                managerAssigneeFilter={data.preferences.managerAssigneeFilter}
+                employeeMyWork={data.preferences.employeeMyWork}
+                onManagerAssigneeFilterChange={(managerAssigneeFilter) =>
+                  persist({
+                    ...data,
+                    preferences: { ...data.preferences, managerAssigneeFilter },
+                  })
+                }
+                onEmployeeMyWorkChange={(employeeMyWork) =>
+                  persist({
+                    ...data,
+                    preferences: { ...data.preferences, employeeMyWork },
+                  })
+                }
               />
             </Box>
           </Container>
@@ -521,6 +618,16 @@ export function App() {
                   touch, or press Space on the handle and use the arrow keys.
                   Press Space to drop or Escape to cancel. The status buttons in
                   Details provide the equivalent non-drag option.
+                </Typography>
+                <Typography component="h3" variant="h6">
+                  Filters and display
+                </Typography>
+                <Typography>
+                  Employee mode starts with My Work and can toggle to Show All.
+                  Manager mode can filter by any employee or Unassigned. Each
+                  mode remembers its filter. Use the header fullscreen control
+                  for a floor display; use it again or press Escape to exit.
+                  Empty status columns remain visible.
                 </Typography>
                 <Typography component="h3" variant="h6">
                   Notes and activity
@@ -694,7 +801,7 @@ export function App() {
                 color="secondary.main"
                 sx={{ fontWeight: 800, letterSpacing: '.08em' }}
               >
-                CONTINUOUS IMPROVEMENT
+                MONARCH PROTOTYPE BROUGHT TO YOU BY JONATHAN BERNIER
               </Typography>
               <Typography
                 component="h1"
@@ -702,7 +809,7 @@ export function App() {
                 color="primary.dark"
                 sx={{ mt: 1 }}
               >
-                Welcome back
+                Welcome
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 1 }}>
                 Sign in to Opportunity Log.

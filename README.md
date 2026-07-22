@@ -30,6 +30,8 @@ The persistent Help panel repeats the essential interaction guidance without lea
 ## Features
 
 - Active and Closed Kanban boards with counts, deterministic ordering, search, and priority filters
+- Manager employee filtering plus a separately remembered Employee My Work/Show All filter
+- Fullscreen mode for manufacturing-floor tablets, with Escape and header-toggle exit
 - Employee submission and self-assignment as Alex Morgan
 - Manager editing, assignment, reassignment, and workflow controls
 - Pointer, touch, and keyboard drag-and-drop with a distinct 44px move handle
@@ -61,7 +63,7 @@ Canceled, Rejected, and Archived are terminal. Cancel and Reject require a reaso
 
 ## Roles and permissions
 
-**Employee (Alex Morgan)** can create opportunities, optionally self-assign a new record, self-assign an unassigned New opportunity, add notes to non-terminal opportunities assigned to Alex, and use valid workflow actions for Alex's assigned work.
+**Employee (Alex Morgan)** can create opportunities, optionally self-assign a new record, self-assign an unassigned New opportunity, add notes to non-terminal opportunities assigned to Alex, and use valid workflow actions for Alex's assigned work. Alex is also the sole Manager identity; switching modes changes permissions, not the actor.
 
 **Manager** can edit non-terminal core details; assign, reassign, or clear assignment; use valid workflow actions; add notes to any opportunity; order cards; load sample data; review the application audit log; and clear all data. Available assignees are Alex Morgan, Jamie Chen, Priya Patel, and Sam Rivera.
 
@@ -71,7 +73,9 @@ Terminal opportunities cannot have their core details, assignment, or status cha
 
 The primary evaluation environment is a current Chrome or Edge browser on a 1920×1080 or 1024×600 landscape Windows device. The board uses large touch targets, horizontal scrolling, restrained high-contrast styling, readable timestamps, persistent Help, and visible text/icon cues rather than colour alone.
 
-Selecting a card opens Details. Moving it requires the separate labelled handle, preventing tap-to-open and drag gestures from competing. The handle supports pointer and touch movement after an 8px activation threshold, plus Space, arrow keys, and Escape. Details always provides an equivalent non-drag workflow.
+Selecting a card opens Details. Moving it requires the separate labelled handle, preventing tap-to-open and drag gestures from competing. The handle supports pointer and touch movement after an 8px activation threshold, plus Space, arrow keys, and Escape. Managers can also reorder within a column by drag or Up/Down controls. Rejected drops explain the permission or workflow rule and highlight the blocked card. Details always provides an equivalent non-drag workflow.
+
+All five Active or four Closed columns remain visible when empty. The layout compacts cards and spacing to fit the supported 1024×600 landscape tablet width; narrower devices use horizontal scrolling as a fallback.
 
 ## Tech stack and rationale
 

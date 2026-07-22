@@ -41,7 +41,7 @@ export function loadState(storage: StorageLike): LoadResult {
           'Saved application data is incompatible or corrupted. Reset application data to recover.',
       };
     }
-    return { status: 'persistent', state: parsed };
+    return { status: 'persistent', state: migrateLegacyActors(parsed) };
   } catch {
     return {
       status: 'recovery-required',
@@ -50,6 +50,35 @@ export function loadState(storage: StorageLike): LoadResult {
         'Saved application data is incompatible or corrupted. Reset application data to recover.',
     };
   }
+}
+
+function migrateLegacyActors(state: AppState): AppState {
+  const actor = (value: string) =>
+    value === 'Jamie Chen' || value === 'Manager' ? 'Alex Morgan' : value;
+  return {
+    ...state,
+    preferences: {
+      welcomeDismissed: state.preferences.welcomeDismissed,
+      managerAssigneeFilter:
+        state.preferences.managerAssigneeFilter ?? 'All Employees',
+      employeeMyWork: state.preferences.employeeMyWork ?? true,
+    },
+    opportunities: state.opportunities.map((opportunity) => ({
+      ...opportunity,
+      notes: opportunity.notes.map((note) => ({
+        ...note,
+        author: actor(note.author),
+      })),
+      history: opportunity.history.map((entry) => ({
+        ...entry,
+        actor: actor(entry.actor),
+      })),
+    })),
+    auditEvents: state.auditEvents.map((event) => ({
+      ...event,
+      actor: actor(event.actor),
+    })),
+  };
 }
 
 export function saveState(storage: StorageLike, state: AppState): SaveResult {
