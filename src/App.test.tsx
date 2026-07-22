@@ -141,4 +141,56 @@ describe('login and application shell', () => {
 
     expect(await axe(container)).toHaveNoViolations();
   });
+
+  it('creates, persists, highlights, filters, and counts an opportunity', async () => {
+    render(<App />);
+    const user = await login();
+    await dismissWelcome(user);
+
+    expect(screen.getByText(/no opportunities yet/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /new opportunity/i }));
+    await user.clear(screen.getByLabelText(/submitter name/i));
+    await user.click(
+      screen.getByRole('button', { name: /create opportunity/i }),
+    );
+    expect(screen.getAllByText(/this field is required/i)).toHaveLength(3);
+
+    await user.type(screen.getByLabelText(/^title/i), 'Safer lift station');
+    await user.type(
+      screen.getByLabelText(/^description/i),
+      'Add a lift table to reduce strain.',
+    );
+    await user.type(screen.getByLabelText(/submitter name/i), 'Alex Morgan');
+    await user.click(screen.getByRole('checkbox', { name: /assign to me/i }));
+    await user.click(
+      screen.getByRole('button', { name: /create opportunity/i }),
+    );
+
+    expect(screen.getByText('OPP-0001')).toBeInTheDocument();
+    expect(screen.getByText('Safer lift station')).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(/1 assigned opportunities/i),
+    ).toBeInTheDocument();
+    expect(localStorage.getItem(STORAGE_KEY)).toContain('Safer lift station');
+    expect(localStorage.getItem(STORAGE_KEY)).toContain('Alex Morgan');
+    expect(localStorage.getItem(STORAGE_KEY)).toContain('Assigned');
+
+    await user.type(screen.getByLabelText(/search opportunities/i), 'missing');
+    expect(screen.getByText(/no opportunities match/i)).toBeInTheDocument();
+  });
+
+  it('protects a dirty submission from accidental discard', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<App />);
+    const user = await login();
+    await dismissWelcome(user);
+    await user.click(screen.getByRole('button', { name: /new opportunity/i }));
+    await user.type(screen.getByLabelText(/^title/i), 'Unsaved idea');
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+    expect(confirm).toHaveBeenCalledWith('Discard this unsaved opportunity?');
+    expect(
+      screen.getByRole('dialog', { name: /new opportunity/i }),
+    ).toBeInTheDocument();
+    confirm.mockRestore();
+  });
 });
