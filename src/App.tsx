@@ -29,6 +29,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { OpportunityBoard } from './board/OpportunityBoard';
 import { OpportunityDetails } from './details/OpportunityDetails';
 import {
+  requiresTransitionReason,
   transitionOpportunity,
   type Opportunity,
   type OpportunityStatus,
@@ -95,6 +96,12 @@ export function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [auditOpen, setAuditOpen] = useState(false);
   const [clearDialog, setClearDialog] = useState(false);
+  const [pendingMove, setPendingMove] = useState<{
+    opportunity: Opportunity;
+    status: OpportunityStatus;
+  } | null>(null);
+  const [moveReason, setMoveReason] = useState('');
+  const [moveError, setMoveError] = useState('');
   const detailsOpener = useRef<HTMLElement | null>(null);
   const boardHeading = useRef<HTMLHeadingElement | null>(null);
 
@@ -184,18 +191,37 @@ export function App() {
     opportunity: Opportunity,
     status: OpportunityStatus,
   ) {
+    if (requiresTransitionReason(status)) {
+      setPendingMove({ opportunity, status });
+      setMoveReason('');
+      setMoveError('');
+      return;
+    }
+    applyDraggedMove(opportunity, status, '');
+  }
+
+  function applyDraggedMove(
+    opportunity: Opportunity,
+    status: OpportunityStatus,
+    reason: string,
+  ) {
     try {
-      const updated = transitionOpportunity(opportunity, status, '', {
+      const updated = transitionOpportunity(opportunity, status, reason, {
         role: session.role,
         actor: 'Alex Morgan',
         now: new Date().toISOString(),
         entryId: crypto.randomUUID(),
       });
       updateOpportunity(updated, `${opportunity.id} moved to ${status}.`);
+      setPendingMove(null);
+      setMoveReason('');
+      setMoveError('');
     } catch (error) {
-      setFeedback(
-        error instanceof Error ? error.message : 'The move was not permitted.',
-      );
+      const message =
+        error instanceof Error ? error.message : 'The move was not permitted.';
+      if (pendingMove || requiresTransitionReason(status))
+        setMoveError(message);
+      else setFeedback(message);
     }
   }
 
@@ -537,6 +563,47 @@ export function App() {
                 onClick={confirmClearAll}
               >
                 Clear all data
+              </Button>
+            </DialogActions>
+          </Dialog>
+          <Dialog
+            open={Boolean(pendingMove)}
+            onClose={() => setPendingMove(null)}
+            aria-labelledby="drag-reason-title"
+          >
+            <DialogTitle id="drag-reason-title">
+              Move to {pendingMove?.status}?
+            </DialogTitle>
+            <DialogContent>
+              <Stack spacing={2} sx={{ pt: 1 }}>
+                <Typography>
+                  This outcome requires a reason, whether moved by drag and drop
+                  or by its details-panel action.
+                </Typography>
+                {moveError && <Alert severity="error">{moveError}</Alert>}
+                <TextField
+                  autoFocus
+                  required
+                  label="Reason"
+                  value={moveReason}
+                  onChange={(event) => setMoveReason(event.target.value)}
+                />
+              </Stack>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setPendingMove(null)}>Back</Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  if (pendingMove)
+                    applyDraggedMove(
+                      pendingMove.opportunity,
+                      pendingMove.status,
+                      moveReason,
+                    );
+                }}
+              >
+                Confirm move
               </Button>
             </DialogActions>
           </Dialog>
