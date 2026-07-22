@@ -28,8 +28,18 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 
 import { OpportunityBoard } from './board/OpportunityBoard';
 import { OpportunityDetails } from './details/OpportunityDetails';
-import type { Opportunity } from './domain/opportunity';
+import {
+  transitionOpportunity,
+  type Opportunity,
+  type OpportunityStatus,
+} from './domain/opportunity';
 import type { Role } from './domain/opportunity';
+import {
+  clearAllData,
+  loadSampleData,
+  moveInCustomOrder,
+  orderOpportunities,
+} from './demo/demoOperations';
 import { type AppState, createInitialState } from './persistence/appState';
 import { loadState, saveState } from './persistence/storage';
 import {
@@ -83,6 +93,8 @@ export function App() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [clearDialog, setClearDialog] = useState(false);
   const detailsOpener = useRef<HTMLElement | null>(null);
   const boardHeading = useRef<HTMLHeadingElement | null>(null);
 
@@ -93,8 +105,13 @@ export function App() {
   }, [session]);
 
   function persist(next: AppState) {
+    const result = saveState(localStorage, next);
+    if (!result.ok) {
+      setFeedback(result.message);
+      return false;
+    }
     setData(next);
-    saveState(localStorage, next);
+    return true;
   }
 
   function addAudit(action: 'login' | 'logout' | 'role_switch', roles = {}) {
@@ -163,6 +180,64 @@ export function App() {
     setFeedback(message);
   }
 
+  function moveOpportunity(
+    opportunity: Opportunity,
+    status: OpportunityStatus,
+  ) {
+    try {
+      const updated = transitionOpportunity(opportunity, status, '', {
+        role: session.role,
+        actor: 'Alex Morgan',
+        now: new Date().toISOString(),
+        entryId: crypto.randomUUID(),
+      });
+      updateOpportunity(updated, `${opportunity.id} moved to ${status}.`);
+    } catch (error) {
+      setFeedback(
+        error instanceof Error ? error.message : 'The move was not permitted.',
+      );
+    }
+  }
+
+  function reorderOpportunity(
+    status: OpportunityStatus,
+    id: string,
+    offset: -1 | 1,
+  ) {
+    const ids = orderOpportunities(
+      data.opportunities.filter((item) => item.status === status),
+      data.customOrder[status],
+    ).map((item) => item.id);
+    try {
+      const nextOrder = moveInCustomOrder(ids, id, offset, session.role);
+      persist({
+        ...data,
+        customOrder: { ...data.customOrder, [status]: nextOrder },
+      });
+      setFeedback('Card order updated.');
+    } catch (error) {
+      setFeedback(
+        error instanceof Error ? error.message : 'Ordering was not permitted.',
+      );
+    }
+  }
+
+  function loadSamples() {
+    const next = loadSampleData(data, new Date().toISOString(), session.role);
+    persist(next);
+    setFeedback(
+      next === data ? 'Sample data is already loaded.' : 'Sample data loaded.',
+    );
+  }
+
+  function confirmClearAll() {
+    const next = clearAllData(data, session.role);
+    if (!persist(next)) return;
+    setSelectedId(null);
+    setClearDialog(false);
+    setFeedback('All application data and history cleared.');
+  }
+
   function openDetails(opportunity: Opportunity, opener: HTMLElement) {
     detailsOpener.current = opener;
     setSelectedId(opportunity.id);
@@ -212,6 +287,19 @@ export function App() {
                 </Button>
               </ButtonGroup>
               <Box sx={{ flexGrow: 1 }} />
+              {session.role === 'Manager' && (
+                <>
+                  <Button color="inherit" onClick={loadSamples}>
+                    Load sample data
+                  </Button>
+                  <Button color="inherit" onClick={() => setAuditOpen(true)}>
+                    Audit log
+                  </Button>
+                  <Button color="inherit" onClick={() => setClearDialog(true)}>
+                    Clear all data
+                  </Button>
+                </>
+              )}
               <Stack spacing={0} sx={{ textAlign: 'right' }}>
                 <Typography variant="body2" sx={{ fontWeight: 800 }}>
                   Alex Morgan
@@ -255,6 +343,10 @@ export function App() {
                 onCreate={addOpportunity}
                 onFeedback={setFeedback}
                 onSelect={openDetails}
+                role={session.role}
+                customOrder={data.customOrder}
+                onMove={moveOpportunity}
+                onReorder={reorderOpportunity}
               />
             </Box>
           </Container>
@@ -276,8 +368,8 @@ export function App() {
                   evaluate manager workflows.
                 </Typography>
                 <Typography>
-                  Managers can load sample data in a later phase. Help is always
-                  available in the header.
+                  Managers can load sample data, reorder cards, review the audit
+                  log, and clear all application data. Help is always available.
                 </Typography>
                 <Alert severity="info">
                   This public prototype stores data in this browser. Do not
@@ -360,12 +452,94 @@ export function App() {
                 </Typography>
                 <Typography>
                   Opportunities move through Active stages before reaching
-                  Closed outcomes. Detailed board guidance will appear with
-                  those features.
+                  Closed outcomes. Drag a card with pointer or keyboard, or use
+                  the equivalent status buttons in its details panel.
+                </Typography>
+                <Typography component="h3" variant="h6">
+                  Demo controls
+                </Typography>
+                <Typography>
+                  Manager mode can load deduplicated samples, inspect
+                  application audit events, manually order cards, and clear all
+                  data. Clear all also erases the complete audit history,
+                  including its own action.
                 </Typography>
               </Stack>
             </Box>
           </Drawer>
+          <Drawer
+            anchor="right"
+            open={auditOpen}
+            onClose={() => setAuditOpen(false)}
+          >
+            <Box
+              role="dialog"
+              aria-labelledby="audit-title"
+              sx={{ width: { xs: '90vw', sm: 560 }, p: 3 }}
+            >
+              <Stack direction="row" sx={{ alignItems: 'center' }}>
+                <Typography
+                  id="audit-title"
+                  component="h2"
+                  variant="h5"
+                  sx={{ fontWeight: 800, flexGrow: 1 }}
+                >
+                  Application audit log
+                </Typography>
+                <IconButton
+                  aria-label="Close audit log"
+                  onClick={() => setAuditOpen(false)}
+                >
+                  <CloseIcon />
+                </IconButton>
+              </Stack>
+              <Divider sx={{ my: 2 }} />
+              {data.auditEvents.length === 0 ? (
+                <Alert severity="info">No application audit events.</Alert>
+              ) : (
+                <Stack component="ol" spacing={1.5} sx={{ pl: 3 }}>
+                  {[...data.auditEvents].reverse().map((event) => (
+                    <Box component="li" key={event.id}>
+                      <Typography sx={{ fontWeight: 700 }}>
+                        {event.action.replaceAll('_', ' ')}
+                      </Typography>
+                      <Typography variant="body2">
+                        {event.actor} ·{' '}
+                        {new Date(event.createdAt).toLocaleString()}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+          </Drawer>
+          <Dialog
+            open={clearDialog}
+            onClose={() => setClearDialog(false)}
+            aria-labelledby="clear-all-title"
+          >
+            <DialogTitle id="clear-all-title">
+              Clear all application data?
+            </DialogTitle>
+            <DialogContent>
+              <Alert severity="warning">
+                This permanently removes all opportunities, notes, activity,
+                custom ordering, preferences, and the complete application audit
+                history. The Clear-all action itself will not remain in the
+                audit log.
+              </Alert>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setClearDialog(false)}>Cancel</Button>
+              <Button
+                color="error"
+                variant="contained"
+                onClick={confirmClearAll}
+              >
+                Clear all data
+              </Button>
+            </DialogActions>
+          </Dialog>
           <Snackbar
             open={Boolean(feedback)}
             autoHideDuration={3000}
