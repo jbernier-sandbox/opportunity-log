@@ -12,6 +12,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import {
   Alert,
   Box,
@@ -131,13 +132,16 @@ function DraggableCard({
       <CardContent>
         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
           <Button
-            aria-label={`Move ${item.id} by drag and drop`}
+            aria-label={`Move ${item.id}`}
             size="small"
+            variant="outlined"
+            startIcon={<DragIndicatorIcon />}
             {...listeners}
             {...attributes}
-            sx={{ minWidth: 44 }}
+            onClick={(event) => event.stopPropagation()}
+            sx={{ minWidth: 88, minHeight: 44, touchAction: 'none' }}
           >
-            <DragIndicatorIcon />
+            Move
           </Button>
           {role === 'Manager' && (
             <>
@@ -230,8 +234,12 @@ export function OpportunityBoard({
   const [assignToMe, setAssignToMe] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
   );
 
   const statuses = OPPORTUNITY_STATUSES.filter((status) =>
@@ -347,6 +355,12 @@ export function OpportunityBoard({
       ) : (
         <DndContext
           sensors={sensors}
+          accessibility={{
+            screenReaderInstructions: {
+              draggable:
+                'To move an opportunity, press Space on its Move handle. Use the arrow keys to choose a permitted destination, press Space to drop, or Escape to cancel.',
+            },
+          }}
           onDragStart={(event) => setDraggedId(String(event.active.id))}
           onDragCancel={() => setDraggedId(null)}
           onDragEnd={finishDrag}

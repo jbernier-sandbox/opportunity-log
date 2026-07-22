@@ -254,6 +254,28 @@ describe('login and application shell', () => {
     );
   });
 
+  it('keeps card selection separate from the drag handle', async () => {
+    seedOpportunity();
+    render(<App />);
+    const user = userEvent.setup();
+    const card = screen.getByRole('button', {
+      name: /open OPP-0001: Safer lift/i,
+    });
+    const handle = screen.getByRole('button', { name: /^move OPP-0001$/i });
+
+    expect(card).toBeInTheDocument();
+    expect(handle).toBeInTheDocument();
+    await user.click(handle);
+    expect(
+      screen.queryByRole('dialog', { name: /opportunity details/i }),
+    ).not.toBeInTheDocument();
+
+    await user.click(card);
+    expect(
+      screen.getByRole('dialog', { name: /opportunity details/i }),
+    ).toBeInTheDocument();
+  });
+
   it('lets a manager edit, assign, clear assignment, and records activity', async () => {
     seedOpportunity({ assignee: 'Alex Morgan', status: 'Assigned' });
     localStorage.setItem(

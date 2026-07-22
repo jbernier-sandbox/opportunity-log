@@ -478,8 +478,11 @@ export function App() {
                 </Typography>
                 <Typography>
                   Opportunities move through Active stages before reaching
-                  Closed outcomes. Drag a card with pointer or keyboard, or use
-                  the equivalent status buttons in its details panel.
+                  Closed outcomes. Select the card body to open Details. To
+                  drag, use the card's labelled Move handle with pointer or
+                  touch, or press Space on the handle and use the arrow keys.
+                  Press Space to drop or Escape to cancel. The status buttons in
+                  Details provide the equivalent non-drag option.
                 </Typography>
                 <Typography component="h3" variant="h6">
                   Demo controls
