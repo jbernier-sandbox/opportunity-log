@@ -523,6 +523,15 @@ export function App() {
                   Details provide the equivalent non-drag option.
                 </Typography>
                 <Typography component="h3" variant="h6">
+                  Notes and activity
+                </Typography>
+                <Typography>
+                  Details contains append-only Notes and a chronological
+                  Activity record. Employees can add notes to non-terminal work
+                  assigned to Alex; managers can add notes to any opportunity.
+                  Cancel and Reject always require a reason.
+                </Typography>
+                <Typography component="h3" variant="h6">
                   Demo controls
                 </Typography>
                 <Typography>
@@ -530,6 +539,15 @@ export function App() {
                   application audit events, manually order cards, and clear all
                   data. Clear all also erases the complete audit history,
                   including its own action.
+                </Typography>
+                <Typography component="h3" variant="h6">
+                  Data and security
+                </Typography>
+                <Typography>
+                  Data is stored only in this browser. Sample loading is
+                  additive and deduplicated. Clear all restores the original
+                  first-launch experience. Login and role switching are
+                  prototype simulations, so do not enter sensitive information.
                 </Typography>
               </Stack>
             </Box>
