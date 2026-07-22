@@ -172,6 +172,25 @@ describe('login and application shell', () => {
     expect(await axe(container)).toHaveNoViolations();
   });
 
+  it('offers an accessible reset when saved application data is corrupted', async () => {
+    localStorage.setItem(STORAGE_KEY, '{');
+    render(<App />);
+
+    const recovery = screen
+      .getByText(/saved application data.*corrupted/i)
+      .closest('[role="alert"]');
+    expect(recovery).not.toBeNull();
+    expect(recovery).toHaveTextContent(/corrupted/i);
+    expect(recovery).toHaveTextContent(/reset application data/i);
+
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: /reset application data/i }));
+
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+    expect(screen.queryByText(/corrupted/i)).not.toBeInTheDocument();
+  });
+
   it('creates, persists, highlights, filters, and counts an opportunity', async () => {
     render(<App />);
     const user = await login();
