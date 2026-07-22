@@ -53,6 +53,16 @@ describe('Phase 5 demo operations', () => {
     );
   });
 
+  it('reorders visible cards while preserving hidden card slots', () => {
+    expect(
+      moveInCustomOrder(['a', 'hidden', 'b', 'c'], 'c', -1, 'Manager', [
+        'a',
+        'b',
+        'c',
+      ]),
+    ).toEqual(['a', 'hidden', 'c', 'b']);
+  });
+
   it('clear all returns exact first-launch state and retains no audit event', () => {
     const dirty = {
       ...createInitialState(),
@@ -65,7 +75,11 @@ describe('Phase 5 demo operations', () => {
         },
       ],
       customOrder: { New: ['OPP-0001'] },
-      preferences: { welcomeDismissed: true },
+      preferences: {
+        welcomeDismissed: true,
+        managerAssigneeFilter: 'All Employees',
+        employeeMyWork: true,
+      },
     };
     expect(clearAllData(dirty, 'Manager')).toEqual(createInitialState());
     expect(clearAllData(dirty, 'Manager').auditEvents).toEqual([]);
