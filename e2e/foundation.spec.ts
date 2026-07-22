@@ -9,7 +9,7 @@ test('logs in and uses the primary shell', async ({ page }) => {
   await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page.getByRole('dialog', { name: /welcome/i })).toBeVisible();
   await page.getByRole('button', { name: /get started/i }).click();
-  await expect(page.getByText(/alex morgan/i)).toBeVisible();
+  await expect(page.getByText('Alex Morgan', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: /help/i }).click();
   await expect(page.getByRole('dialog', { name: /help/i })).toBeVisible();
 });
