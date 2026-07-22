@@ -10,7 +10,13 @@ export const SCHEMA_VERSION = 1;
 
 export interface AuditEvent {
   id: string;
-  action: 'login' | 'logout' | 'role_switch';
+  action:
+    | 'login'
+    | 'logout'
+    | 'role_switch'
+    | 'sample_data_loaded'
+    | 'storage_reset'
+    | 'recovery_used';
   actor: string;
   createdAt: string;
   fromRole?: Role;

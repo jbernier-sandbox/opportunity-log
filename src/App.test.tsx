@@ -318,4 +318,64 @@ describe('login and application shell', () => {
       .click(screen.getByRole('button', { name: /open OPP-0001/i }));
     expect(await axe(document.body)).toHaveNoViolations();
   });
+
+  it('keeps demo controls manager-only, deduplicates samples, shows audit, and clears all history', async () => {
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ authenticated: true, role: 'Employee' }),
+    );
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...createInitialState(),
+        preferences: { welcomeDismissed: true },
+      }),
+    );
+    const { unmount } = render(<App />);
+    expect(
+      screen.queryByRole('button', { name: /load sample data/i }),
+    ).not.toBeInTheDocument();
+    unmount();
+
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ authenticated: true, role: 'Manager' }),
+    );
+    render(<App />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /load sample data/i }));
+    const first = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as {
+      opportunities: Opportunity[];
+    };
+    await user.click(screen.getByRole('button', { name: /load sample data/i }));
+    const second = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as {
+      opportunities: Opportunity[];
+    };
+    expect(second.opportunities).toHaveLength(first.opportunities.length);
+
+    await user.click(screen.getByRole('button', { name: /audit log/i }));
+    const auditDialog = screen.getByRole('dialog', {
+      name: /application audit log/i,
+    });
+    expect(screen.getByText(/sample data loaded/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /close audit log/i }));
+    await waitForElementToBeRemoved(auditDialog);
+
+    await user.click(screen.getByRole('button', { name: /clear all data/i }));
+    expect(
+      screen.getByText(/complete application audit history/i),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /clear all data/i }));
+    const cleared = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}') as {
+      opportunities: Opportunity[];
+      auditEvents: unknown[];
+      preferences: { welcomeDismissed: boolean };
+    };
+    expect(cleared.opportunities).toEqual([]);
+    expect(cleared.auditEvents).toEqual([]);
+    expect(cleared.preferences.welcomeDismissed).toBe(false);
+    expect(
+      screen.getByText(/all application data and history cleared/i),
+    ).toBeInTheDocument();
+  });
 });
