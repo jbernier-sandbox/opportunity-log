@@ -266,8 +266,16 @@ export function assignOpportunity(
         'Employees may only self-assign an unassigned New opportunity.',
       );
   }
+  if (
+    assignee === null &&
+    ['Development', 'Pending Release', 'Released'].includes(opportunity.status)
+  ) {
+    throw new Error(
+      `${opportunity.status} opportunities cannot be unassigned; choose another assignee.`,
+    );
+  }
   if (opportunity.assignee === assignee) return opportunity;
-  return withHistory(
+  const assigned = withHistory(
     opportunity,
     context,
     {
@@ -281,6 +289,28 @@ export function assignOpportunity(
       ],
     },
     { assignee },
+  );
+  const derivedStatus =
+    opportunity.status === 'New' && assignee
+      ? 'Assigned'
+      : opportunity.status === 'Assigned' && !assignee
+        ? 'New'
+        : null;
+  if (!derivedStatus) return assigned;
+  return withHistory(
+    assigned,
+    { ...context, entryId: `${context.entryId}-status` },
+    {
+      action: 'status_changed',
+      changes: [
+        {
+          field: 'status',
+          previousValue: opportunity.status,
+          newValue: derivedStatus,
+        },
+      ],
+    },
+    { status: derivedStatus },
   );
 }
 
