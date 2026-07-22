@@ -48,6 +48,7 @@ import {
   type Role,
   type ValidationIssue,
   validateNewOpportunity,
+  ASSIGNEES,
 } from '../domain/opportunity';
 import { orderOpportunities } from '../demo/demoOperations';
 
@@ -69,6 +70,16 @@ interface Props {
   customOrder: Partial<Record<OpportunityStatus, string[]>>;
   onMove: (opportunity: Opportunity, status: OpportunityStatus) => void;
   onReorder: (status: OpportunityStatus, id: string, offset: -1 | 1) => void;
+  onReorderDrop: (
+    status: OpportunityStatus,
+    id: string,
+    visibleIds: string[],
+    targetId?: string,
+  ) => void;
+  managerAssigneeFilter: string;
+  employeeMyWork: boolean;
+  onManagerAssigneeFilterChange: (value: string) => void;
+  onEmployeeMyWorkChange: (value: boolean) => void;
 }
 
 function DropColumn({
@@ -89,7 +100,7 @@ function DropColumn({
         bgcolor: isOver ? '#c6e3df' : '#dfe8ea',
         border: disabled ? '2px dashed #87979b' : '2px solid transparent',
         borderRadius: 2,
-        p: 2,
+        p: 1,
         minHeight: 180,
       }}
     >
@@ -115,8 +126,18 @@ function DraggableCard({
   onSelect: Props['onSelect'];
   onReorder: Props['onReorder'];
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({ id: item.id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    transform,
+    isDragging,
+  } = useDraggable({ id: item.id });
+  const { setNodeRef: setDropRef } = useDroppable({ id: `card:${item.id}` });
+  const setNodeRef = (node: HTMLElement | null) => {
+    setDragRef(node);
+    setDropRef(node);
+  };
   return (
     <Card
       ref={setNodeRef}
@@ -129,7 +150,7 @@ function DraggableCard({
           : undefined,
       }}
     >
-      <CardContent>
+      <CardContent sx={{ p: 1, '&:last-child': { pb: 1 } }}>
         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
           <Button
             aria-label={`Move ${item.id}`}
@@ -139,7 +160,7 @@ function DraggableCard({
             {...listeners}
             {...attributes}
             onClick={(event) => event.stopPropagation()}
-            sx={{ minWidth: 88, minHeight: 44, touchAction: 'none' }}
+            sx={{ minWidth: 70, minHeight: 44, touchAction: 'none', px: 0.5 }}
           >
             Move
           </Button>
@@ -191,13 +212,21 @@ function DraggableCard({
               color={item.priority === 'High' ? 'error' : 'default'}
             />
           </Stack>
-          <Typography component="h3" sx={{ mt: 1, fontWeight: 800 }}>
+          <Typography
+            component="h3"
+            variant="body2"
+            sx={{ mt: 0.5, fontWeight: 800 }}
+          >
             {item.title}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ mt: 0.5, display: 'block' }}
+          >
             {item.description}
           </Typography>
-          <Typography variant="caption" sx={{ mt: 1.5, display: 'block' }}>
+          <Typography variant="caption" sx={{ mt: 0.5, display: 'block' }}>
             Submitted by {item.submitterName}
           </Typography>
         </Box>
@@ -224,6 +253,11 @@ export function OpportunityBoard({
   customOrder,
   onMove,
   onReorder,
+  onReorderDrop,
+  managerAssigneeFilter,
+  employeeMyWork,
+  onManagerAssigneeFilterChange,
+  onEmployeeMyWorkChange,
 }: Props) {
   const [query, setQuery] = useState('');
   const [priority, setPriority] = useState<Priority | 'All'>('All');
@@ -256,6 +290,14 @@ export function OpportunityBoard({
           : !CLOSED_STATUSES.has(item.status),
       )
       .filter((item) => priority === 'All' || item.priority === priority)
+      .filter((item) => {
+        if (role === 'Employee')
+          return !employeeMyWork || item.assignee === 'Alex Morgan';
+        if (managerAssigneeFilter === 'All Employees') return true;
+        if (managerAssigneeFilter === 'Unassigned')
+          return item.assignee === null;
+        return item.assignee === managerAssigneeFilter;
+      })
       .filter(
         (item) =>
           !term ||
@@ -264,7 +306,15 @@ export function OpportunityBoard({
           ),
       )
       .sort(compareByDefaultOrder);
-  }, [opportunities, priority, query, view]);
+  }, [
+    employeeMyWork,
+    managerAssigneeFilter,
+    opportunities,
+    priority,
+    query,
+    role,
+    view,
+  ]);
 
   const dirty = JSON.stringify(form) !== JSON.stringify(EMPTY_FORM);
 
@@ -302,10 +352,39 @@ export function OpportunityBoard({
     const opportunity = opportunities.find(
       (item) => item.id === event.active.id,
     );
-    const status = OPPORTUNITY_STATUSES.find((item) => item === event.over?.id);
+    const overId = String(event.over?.id ?? '');
+    const targetCardId = overId.startsWith('card:')
+      ? overId.slice(5)
+      : undefined;
+    const targetCard = opportunities.find((item) => item.id === targetCardId);
+    const status =
+      targetCard?.status ??
+      OPPORTUNITY_STATUSES.find((item) => item === overId);
     setDraggedId(null);
-    if (opportunity && status && opportunity.status !== status)
-      onMove(opportunity, status);
+    if (!opportunity || !status) {
+      if (opportunity) {
+        setHighlightedId(opportunity.id);
+        window.setTimeout(() => setHighlightedId(''), 2500);
+        onFeedback(
+          role === 'Employee'
+            ? 'This card could not move because your Employee permissions or the workflow rule does not allow that destination.'
+            : 'This card could not move because the workflow rule does not allow that destination.',
+        );
+      }
+      return;
+    }
+    if (opportunity.status !== status) onMove(opportunity, status);
+    else if (role === 'Manager') {
+      const visibleIds = orderOpportunities(
+        filtered.filter((item) => item.status === status),
+        customOrder[status],
+      ).map((item) => item.id);
+      onReorderDrop(status, opportunity.id, visibleIds, targetCardId);
+    } else {
+      setHighlightedId(opportunity.id);
+      window.setTimeout(() => setHighlightedId(''), 2500);
+      onFeedback('Only managers may reorder cards within a column.');
+    }
   }
 
   return (
@@ -332,6 +411,33 @@ export function OpportunityBoard({
             ))}
           </Select>
         </FormControl>
+        {role === 'Manager' ? (
+          <FormControl sx={{ minWidth: 190 }}>
+            <InputLabel id="employee-filter-label">Employee</InputLabel>
+            <Select
+              labelId="employee-filter-label"
+              label="Employee"
+              value={managerAssigneeFilter}
+              onChange={(event) =>
+                onManagerAssigneeFilterChange(event.target.value)
+              }
+            >
+              {['All Employees', ...ASSIGNEES, 'Unassigned'].map((value) => (
+                <MenuItem key={value} value={value}>
+                  {value}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        ) : (
+          <Button
+            variant={employeeMyWork ? 'contained' : 'outlined'}
+            aria-pressed={employeeMyWork}
+            onClick={() => onEmployeeMyWorkChange(!employeeMyWork)}
+          >
+            {employeeMyWork ? 'My Work' : 'Show All'}
+          </Button>
+        )}
         <Box sx={{ flexGrow: 1 }} />
         {view === 'Active' && (
           <Button
@@ -344,101 +450,93 @@ export function OpportunityBoard({
         )}
       </Stack>
 
-      {opportunities.length === 0 ? (
+      {opportunities.length === 0 && (
         <Alert severity="info">
           No opportunities yet. Create the first opportunity to begin.
         </Alert>
-      ) : filtered.length === 0 ? (
+      )}
+      {opportunities.length > 0 && filtered.length === 0 && (
         <Alert severity="info">
           No opportunities match the current filters.
         </Alert>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          accessibility={{
-            screenReaderInstructions: {
-              draggable:
-                'To move an opportunity, press Space on its Move handle. Use the arrow keys to choose a permitted destination, press Space to drop, or Escape to cancel.',
-            },
-          }}
-          onDragStart={(event) => setDraggedId(String(event.active.id))}
-          onDragCancel={() => setDraggedId(null)}
-          onDragEnd={finishDrag}
-        >
-          <Box
-            aria-label={`${view} opportunity board`}
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: '1fr',
-                lg: `repeat(${Math.min(statuses.length, 3)}, minmax(260px, 1fr))`,
-              },
-              gap: 2,
-            }}
-          >
-            {statuses.map((status) => {
-              const items = orderOpportunities(
-                filtered.filter((item) => item.status === status),
-                customOrder[status],
-              );
-              const dragged = opportunities.find(
-                (item) => item.id === draggedId,
-              );
-              const validTarget =
-                !dragged ||
-                dragged.status === status ||
-                availableTransitions(dragged, role).includes(status);
-              return (
-                <DropColumn
-                  key={status}
-                  status={status}
-                  disabled={!validTarget}
-                >
-                  <Stack
-                    direction="row"
-                    sx={{
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Typography
-                      id={`column-${status}`}
-                      component="h2"
-                      variant="h6"
-                    >
-                      {status}
-                    </Typography>
-                    <Chip
-                      label={items.length}
-                      size="small"
-                      aria-label={`${items.length} ${status} opportunities`}
-                    />
-                  </Stack>
-                  <Stack spacing={1.5} sx={{ mt: 2 }}>
-                    {items.length === 0 && (
-                      <Typography color="text.secondary">
-                        No opportunities
-                      </Typography>
-                    )}
-                    {items.map((item, index) => (
-                      <DraggableCard
-                        key={item.id}
-                        item={item}
-                        highlighted={item.id === highlightedId}
-                        role={role}
-                        index={index}
-                        count={items.length}
-                        onSelect={onSelect}
-                        onReorder={onReorder}
-                      />
-                    ))}
-                  </Stack>
-                </DropColumn>
-              );
-            })}
-          </Box>
-        </DndContext>
       )}
+      <DndContext
+        sensors={sensors}
+        accessibility={{
+          screenReaderInstructions: {
+            draggable:
+              'To move an opportunity, press Space on its Move handle. Use the arrow keys to choose a permitted destination, press Space to drop, or Escape to cancel.',
+          },
+        }}
+        onDragStart={(event) => setDraggedId(String(event.active.id))}
+        onDragCancel={() => setDraggedId(null)}
+        onDragEnd={finishDrag}
+      >
+        <Box
+          aria-label={`${view} opportunity board`}
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${statuses.length}, minmax(180px, 1fr))`,
+            gap: 1,
+            minWidth: { xs: `${statuses.length * 188}px`, md: 0 },
+          }}
+        >
+          {statuses.map((status) => {
+            const items = orderOpportunities(
+              filtered.filter((item) => item.status === status),
+              customOrder[status],
+            );
+            const dragged = opportunities.find((item) => item.id === draggedId);
+            const validTarget =
+              !dragged ||
+              dragged.status === status ||
+              availableTransitions(dragged, role).includes(status);
+            return (
+              <DropColumn key={status} status={status} disabled={!validTarget}>
+                <Stack
+                  direction="row"
+                  sx={{
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Typography
+                    id={`column-${status}`}
+                    component="h2"
+                    variant="h6"
+                  >
+                    {status}
+                  </Typography>
+                  <Chip
+                    label={items.length}
+                    size="small"
+                    aria-label={`${items.length} ${status} opportunities`}
+                  />
+                </Stack>
+                <Stack spacing={1} sx={{ mt: 1 }}>
+                  {items.length === 0 && (
+                    <Typography color="text.secondary">
+                      No opportunities
+                    </Typography>
+                  )}
+                  {items.map((item, index) => (
+                    <DraggableCard
+                      key={item.id}
+                      item={item}
+                      highlighted={item.id === highlightedId}
+                      role={role}
+                      index={index}
+                      count={items.length}
+                      onSelect={onSelect}
+                      onReorder={onReorder}
+                    />
+                  ))}
+                </Stack>
+              </DropColumn>
+            );
+          })}
+        </Box>
+      </DndContext>
 
       <Dialog
         open={dialogOpen}
