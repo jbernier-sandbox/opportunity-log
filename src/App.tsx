@@ -26,6 +26,8 @@ import {
 } from '@mui/material';
 import { type FormEvent, useEffect, useState } from 'react';
 
+import { OpportunityBoard } from './board/OpportunityBoard';
+import type { Opportunity } from './domain/opportunity';
 import type { Role } from './domain/opportunity';
 import { type AppState, createInitialState } from './persistence/appState';
 import { loadState, saveState } from './persistence/storage';
@@ -139,6 +141,14 @@ export function App() {
     });
   }
 
+  function addOpportunity(opportunity: Opportunity) {
+    persist({
+      ...data,
+      opportunities: [...data.opportunities, opportunity],
+      nextOpportunitySequence: data.nextOpportunitySequence + 1,
+    });
+  }
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -204,10 +214,15 @@ export function App() {
             <Typography component="h1" variant="h1" color="primary.dark">
               {view} opportunities
             </Typography>
-            <Typography color="text.secondary" sx={{ mt: 1.5 }}>
-              The opportunity board arrives in Phase 3. Your current view and
-              role controls are ready.
-            </Typography>
+            <Box sx={{ mt: 3 }}>
+              <OpportunityBoard
+                opportunities={data.opportunities}
+                view={view}
+                nextSequence={data.nextOpportunitySequence}
+                onCreate={addOpportunity}
+                onFeedback={setFeedback}
+              />
+            </Box>
           </Container>
 
           <Dialog
