@@ -8,6 +8,8 @@ import userEvent from '@testing-library/user-event';
 import { axe } from 'jest-axe';
 
 import { App } from './App';
+import { createOpportunity, type Opportunity } from './domain/opportunity';
+import { createInitialState } from './persistence/appState';
 import { STORAGE_KEY } from './persistence/storage';
 import { SESSION_KEY } from './session/session';
 
@@ -39,6 +41,34 @@ describe('login and application shell', () => {
       }),
     );
     await waitForElementToBeRemoved(dialog);
+  }
+
+  function seedOpportunity(overrides: Partial<Opportunity> = {}) {
+    const item = {
+      ...createOpportunity(
+        {
+          title: 'Safer lift',
+          description: 'Add a lift table',
+          submitterName: 'Alex Morgan',
+        },
+        1,
+        '2026-07-22T15:00:00.000Z',
+      ),
+      ...overrides,
+    };
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ...createInitialState(),
+        opportunities: [item],
+        nextOpportunitySequence: 2,
+        preferences: { welcomeDismissed: true },
+      }),
+    );
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ authenticated: true, role: 'Employee' }),
+    );
   }
 
   it('rejects invalid credentials and accepts the documented login', async () => {
@@ -192,5 +222,100 @@ describe('login and application shell', () => {
       screen.getByRole('dialog', { name: /new opportunity/i }),
     ).toBeInTheDocument();
     confirm.mockRestore();
+  });
+
+  it('lets an employee self-assign, add a note, and advance assigned work', async () => {
+    seedOpportunity();
+    render(<App />);
+    const user = userEvent.setup();
+    const card = screen.getByRole('button', { name: /open OPP-0001/i });
+    await user.click(card);
+    expect(
+      screen.getByRole('dialog', { name: /opportunity details/i }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /assign to me/i }));
+    await user.type(
+      screen.getByLabelText(/add note/i),
+      'Checked the work area.',
+    );
+    await user.click(screen.getByRole('button', { name: /^add note$/i }));
+    expect(screen.getByText('Checked the work area.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /move to assigned/i }));
+    const assignedDialog = screen.getByRole('dialog', {
+      name: /change status to assigned/i,
+    });
+    await user.click(
+      screen.getByRole('button', { name: /confirm status change/i }),
+    );
+    await waitForElementToBeRemoved(assignedDialog);
+    expect(screen.getByText(/status changed to assigned/i)).toBeInTheDocument();
+    expect(localStorage.getItem(STORAGE_KEY)).toContain(
+      'Checked the work area.',
+    );
+  });
+
+  it('lets a manager edit, assign, clear assignment, and records activity', async () => {
+    seedOpportunity({ assignee: 'Alex Morgan', status: 'Assigned' });
+    localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ authenticated: true, role: 'Manager' }),
+    );
+    render(<App />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /open OPP-0001/i }));
+    await user.click(screen.getByRole('button', { name: /edit details/i }));
+    await user.clear(screen.getByLabelText(/^title/i));
+    await user.type(screen.getByLabelText(/^title/i), 'Safer lift station');
+    await user.click(screen.getByRole('button', { name: /save details/i }));
+    expect(
+      screen.getByRole('heading', { name: 'Safer lift station' }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByLabelText(/assignee/i));
+    await user.click(screen.getByRole('option', { name: /unassigned/i }));
+    expect(screen.getByText(/workflow locked/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/title: Safer lift → Safer lift station/i),
+    ).toBeInTheDocument();
+  });
+
+  it('requires a reason for canceling and preserves focus after details close', async () => {
+    seedOpportunity({ assignee: 'Alex Morgan' });
+    render(<App />);
+    const user = userEvent.setup();
+    const card = screen.getByRole('button', { name: /open OPP-0001/i });
+    await user.click(card);
+    await user.click(screen.getByRole('button', { name: /move to canceled/i }));
+    await user.click(
+      screen.getByRole('button', { name: /confirm status change/i }),
+    );
+    expect(screen.getByText(/reason is required/i)).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/reason/i), 'Duplicate request');
+    const canceledDialog = screen.getByRole('dialog', {
+      name: /change status to canceled/i,
+    });
+    await user.click(
+      screen.getByRole('button', { name: /confirm status change/i }),
+    );
+    await waitForElementToBeRemoved(canceledDialog);
+    expect(screen.getAllByText(/status changed to canceled/i)).not.toHaveLength(
+      0,
+    );
+    await user.click(
+      screen.getByRole('button', { name: /close opportunity details/i }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole('heading', { name: /active opportunities/i }),
+      ).toHaveFocus(),
+    );
+  });
+
+  it('has no detectable accessibility violations in opportunity details', async () => {
+    seedOpportunity({ assignee: 'Alex Morgan', status: 'Assigned' });
+    render(<App />);
+    await userEvent
+      .setup()
+      .click(screen.getByRole('button', { name: /open OPP-0001/i }));
+    expect(await axe(document.body)).toHaveNoViolations();
   });
 });
