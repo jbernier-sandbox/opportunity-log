@@ -143,6 +143,57 @@ describe('login and application shell', () => {
     await waitFor(() => expect(help).toHaveFocus());
   });
 
+  it('collapses to the approved compact header and exposes the selected view', async () => {
+    render(<App />);
+    const user = await login();
+    await dismissWelcome(user);
+
+    const active = screen.getByRole('button', {
+      name: /active opportunities/i,
+    });
+    expect(active).toHaveAttribute('aria-current', 'page');
+    expect(
+      screen.queryByText(/monarch prototype brought/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: /active opportunities/i }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^collapse$/i }));
+    expect(screen.getByText('Opportunity Log')).toBeInTheDocument();
+    expect(screen.getByText('Employee', { exact: true })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /enter fullscreen/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^expand$/i })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(
+      screen.queryByLabelText(/search opportunities/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /switch to manager/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('uses employee filter action labels and Show All clears employee filters', async () => {
+    seedOpportunity({ assignee: 'Alex Morgan', status: 'Assigned' });
+    render(<App />);
+    const user = userEvent.setup();
+
+    expect(
+      screen.getByRole('button', { name: /^show all$/i }),
+    ).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/search opportunities/i), 'missing');
+    await user.click(screen.getByRole('button', { name: /^show all$/i }));
+    expect(screen.getByLabelText(/search opportunities/i)).toHaveValue('');
+    expect(
+      screen.getByRole('button', { name: /^my work$/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Safer lift')).toBeInTheDocument();
+  });
+
   it('logs out and returns the next login to Employee and Active', async () => {
     render(<App />);
     const user = await login();
@@ -285,7 +336,7 @@ describe('login and application shell', () => {
     seedOpportunity();
     render(<App />);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /my work/i }));
+    await user.click(screen.getByRole('button', { name: /show all/i }));
     const card = screen.getByRole('button', { name: /open OPP-0001/i });
     await user.click(card);
     expect(
@@ -310,7 +361,7 @@ describe('login and application shell', () => {
     seedOpportunity();
     render(<App />);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /my work/i }));
+    await user.click(screen.getByRole('button', { name: /show all/i }));
     const card = screen.getByRole('button', {
       name: /open OPP-0001: Safer lift/i,
     });
@@ -382,7 +433,7 @@ describe('login and application shell', () => {
     );
     await waitFor(() =>
       expect(
-        screen.getByRole('heading', { name: /active opportunities/i }),
+        screen.getByRole('button', { name: /active opportunities/i }),
       ).toHaveFocus(),
     );
   });
