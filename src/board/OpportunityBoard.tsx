@@ -46,6 +46,7 @@ interface Props {
   nextSequence: number;
   onCreate: (opportunity: Opportunity) => void;
   onFeedback: (message: string) => void;
+  onSelect: (opportunity: Opportunity, opener: HTMLElement) => void;
 }
 
 const EMPTY_FORM: NewOpportunityInput = {
@@ -61,6 +62,7 @@ export function OpportunityBoard({
   nextSequence,
   onCreate,
   onFeedback,
+  onSelect,
 }: Props) {
   const [query, setQuery] = useState('');
   const [priority, setPriority] = useState<Priority | 'All'>('All');
@@ -229,7 +231,19 @@ export function OpportunityBoard({
                           : undefined
                       }
                     >
-                      <CardContent>
+                      <CardContent
+                        component="button"
+                        type="button"
+                        onClick={(event) => onSelect(item, event.currentTarget)}
+                        aria-label={`Open ${item.id}: ${item.title}`}
+                        sx={{
+                          width: '100%',
+                          textAlign: 'left',
+                          border: 0,
+                          bgcolor: 'transparent',
+                          cursor: 'pointer',
+                        }}
+                      >
                         <Stack
                           direction="row"
                           sx={{ justifyContent: 'space-between', gap: 1 }}
