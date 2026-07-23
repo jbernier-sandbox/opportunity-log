@@ -74,7 +74,7 @@ Terminal opportunities cannot have their core details, assignment, or status cha
 
 The primary evaluation environment is a current Chrome or Edge browser on a 1920×1080 or 1024×600 landscape Windows device. The board uses large touch targets, horizontal scrolling, restrained high-contrast styling, readable timestamps, persistent Help, and visible text/icon cues rather than colour alone.
 
-Selecting a card opens Details. Moving it requires the separate labelled handle, preventing tap-to-open and drag gestures from competing. The handle supports pointer and touch movement after an 8px activation threshold, plus Space, arrow keys, and Escape. Managers can also reorder within a column by drag or Up/Down controls. Rejected drops explain the permission or workflow rule and highlight the blocked card. Details always provides an equivalent non-drag workflow.
+Selecting a card opens Details. Moving it requires the separate labelled handle, preventing tap-to-open and drag gestures from competing. The handle supports pointer and touch movement after an 8px activation threshold, plus Space, arrow keys, and Escape. Managers reorder within a column through drag-and-drop. Rejected drops explain the permission or workflow rule and highlight the blocked card. Details always provides an equivalent non-drag workflow.
 
 The selected Active or Closed header button identifies the current board; separate board headings and the former authenticated subtitle are omitted to preserve vertical space. Header and filter controls remain visible without a collapse mode.
 
