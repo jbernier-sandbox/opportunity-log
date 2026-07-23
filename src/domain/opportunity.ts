@@ -141,9 +141,9 @@ export const TERMINAL_STATUSES: ReadonlySet<OpportunityStatus> = new Set([
 
 const TRANSITIONS: Record<OpportunityStatus, readonly OpportunityStatus[]> = {
   New: ['Assigned', 'Canceled', 'Rejected'],
-  Assigned: ['Development', 'Canceled', 'Rejected'],
-  Development: ['Pending Release', 'Canceled', 'Rejected'],
-  'Pending Release': ['Released', 'Canceled', 'Rejected'],
+  Assigned: ['New', 'Development', 'Canceled', 'Rejected'],
+  Development: ['Assigned', 'Pending Release', 'Canceled', 'Rejected'],
+  'Pending Release': ['Development', 'Released', 'Canceled', 'Rejected'],
   Released: ['Complete', 'Canceled', 'Rejected'],
   Complete: ['Canceled', 'Rejected', 'Archived'],
   Canceled: [],
@@ -350,7 +350,7 @@ export function transitionOpportunity(
   const trimmedReason = reason.trim();
   if (requiresTransitionReason(target) && !trimmedReason)
     throw new Error('A reason is required for this outcome.');
-  return withHistory(
+  const transitioned = withHistory(
     opportunity,
     context,
     {
@@ -365,6 +365,24 @@ export function transitionOpportunity(
       reason: trimmedReason || undefined,
     },
     { status: target },
+  );
+  if (opportunity.status !== 'Assigned' || target !== 'New') {
+    return transitioned;
+  }
+  return withHistory(
+    transitioned,
+    { ...context, entryId: `${context.entryId}-assignment` },
+    {
+      action: 'assigned',
+      changes: [
+        {
+          field: 'assignee',
+          previousValue: opportunity.assignee,
+          newValue: null,
+        },
+      ],
+    },
+    { assignee: null },
   );
 }
 

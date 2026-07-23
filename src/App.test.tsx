@@ -91,6 +91,16 @@ describe('login and application shell', () => {
     expect(localStorage.getItem(SESSION_KEY)).toContain('authenticated');
   });
 
+  it('shows the prototype credit beneath the prototype name', () => {
+    render(<App />);
+
+    const name = screen.getByText(/^monarch prototype$/i);
+    const credit = screen.getByText(/^brought to you by Jonathan Bernier$/i);
+    expect(name.compareDocumentPosition(credit)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+  });
+
   it('retains a session and shows the welcome only until dismissed', async () => {
     localStorage.setItem(
       SESSION_KEY,

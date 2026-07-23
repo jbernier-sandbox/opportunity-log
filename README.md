@@ -46,21 +46,21 @@ The persistent Help panel repeats the essential interaction guidance without lea
 
 The standard path is:
 
-`New → Assigned → Development → Pending Release → Released → Complete → Archived`
+`New ⇄ Assigned ⇄ Development ⇄ Pending Release → Released → Complete → Archived`
 
 The complete transition rules are:
 
-| Current status               | Valid destinations                  |
-| ---------------------------- | ----------------------------------- |
-| New                          | Assigned, Canceled, Rejected        |
-| Assigned                     | Development, Canceled, Rejected     |
-| Development                  | Pending Release, Canceled, Rejected |
-| Pending Release              | Released, Canceled, Rejected        |
-| Released                     | Complete, Canceled, Rejected        |
-| Complete                     | Archived, Canceled, Rejected        |
-| Archived, Canceled, Rejected | None                                |
+| Current status               | Valid destinations                            |
+| ---------------------------- | --------------------------------------------- |
+| New                          | Assigned, Canceled, Rejected                  |
+| Assigned                     | New, Development, Canceled, Rejected          |
+| Development                  | Assigned, Pending Release, Canceled, Rejected |
+| Pending Release              | Development, Released, Canceled, Rejected     |
+| Released                     | Complete, Canceled, Rejected                  |
+| Complete                     | Archived, Canceled, Rejected                  |
+| Archived, Canceled, Rejected | None                                          |
 
-Canceled, Rejected, and Archived are terminal. Cancel and Reject require a reason. If a manager clears the assignee after an opportunity has left New, workflow progression is locked until the opportunity is assigned again.
+Canceled, Rejected, and Archived are terminal. Cancel and Reject require a reason. Returning Assigned work to New requires confirmation and automatically removes its assignee. Released work can move only to Complete, Canceled, or Rejected.
 
 ## Roles and permissions
 

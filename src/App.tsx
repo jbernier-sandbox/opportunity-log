@@ -237,7 +237,10 @@ export function App() {
     opportunity: Opportunity,
     status: OpportunityStatus,
   ) {
-    if (requiresTransitionReason(status)) {
+    if (
+      requiresTransitionReason(status) ||
+      (opportunity.status === 'Assigned' && status === 'New')
+    ) {
       setPendingMove({ opportunity, status });
       setMoveReason('');
       setMoveError('');
@@ -719,18 +722,29 @@ export function App() {
             </DialogTitle>
             <DialogContent>
               <Stack spacing={2} sx={{ pt: 1 }}>
-                <Typography>
-                  This outcome requires a reason, whether moved by drag and drop
-                  or by its details-panel action.
-                </Typography>
+                {pendingMove?.opportunity.status === 'Assigned' &&
+                pendingMove.status === 'New' ? (
+                  <Alert severity="warning">
+                    The assigned user will be removed. This opportunity will be
+                    updated to Unassigned and returned to New status.
+                  </Alert>
+                ) : (
+                  <Typography>
+                    This outcome requires a reason, whether moved by drag and
+                    drop or by its details-panel action.
+                  </Typography>
+                )}
                 {moveError && <Alert severity="error">{moveError}</Alert>}
-                <TextField
-                  autoFocus
-                  required
-                  label="Reason"
-                  value={moveReason}
-                  onChange={(event) => setMoveReason(event.target.value)}
-                />
+                {pendingMove &&
+                  requiresTransitionReason(pendingMove.status) && (
+                    <TextField
+                      autoFocus
+                      required
+                      label="Reason"
+                      value={moveReason}
+                      onChange={(event) => setMoveReason(event.target.value)}
+                    />
+                  )}
               </Stack>
             </DialogContent>
             <DialogActions>
@@ -778,7 +792,10 @@ export function App() {
                 color="secondary.main"
                 sx={{ fontWeight: 800, letterSpacing: '.08em' }}
               >
-                MONARCH PROTOTYPE BROUGHT TO YOU BY JONATHAN BERNIER
+                MONARCH PROTOTYPE
+              </Typography>
+              <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+                Brought to you by Jonathan Bernier
               </Typography>
               <Typography
                 component="h1"

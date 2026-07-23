@@ -106,6 +106,24 @@ describe('opportunity domain', () => {
     ).toBe(true);
     expect(
       canTransition(
+        opportunity({ status: 'Pending Release', assignee: 'Alex Morgan' }),
+        'Development',
+      ),
+    ).toBe(true);
+    expect(
+      canTransition(
+        opportunity({ status: 'Development', assignee: 'Alex Morgan' }),
+        'Assigned',
+      ),
+    ).toBe(true);
+    expect(
+      canTransition(
+        opportunity({ status: 'Assigned', assignee: 'Alex Morgan' }),
+        'New',
+      ),
+    ).toBe(true);
+    expect(
+      canTransition(
         opportunity({ status: 'Released', assignee: 'Alex Morgan' }),
         'Complete',
       ),
@@ -308,6 +326,7 @@ describe('opportunity domain', () => {
       assignee: 'Alex Morgan',
     });
     expect(availableTransitions(assigned, 'Employee')).toEqual([
+      'New',
       'Development',
       'Canceled',
       'Rejected',
@@ -329,5 +348,27 @@ describe('opportunity domain', () => {
       action: 'status_changed',
       reason: 'No longer needed',
     });
+  });
+
+  it('returns Assigned work to New and removes its assignee atomically', () => {
+    const result = transitionOpportunity(
+      opportunity({ status: 'Assigned', assignee: 'Jamie Chen' }),
+      'New',
+      '',
+      MANAGER,
+    );
+
+    expect(result).toMatchObject({ status: 'New', assignee: null });
+    expect(result.history.map((entry) => entry.action)).toEqual([
+      'status_changed',
+      'assigned',
+    ]);
+    expect(result.history[1]?.changes).toEqual([
+      {
+        field: 'assignee',
+        previousValue: 'Jamie Chen',
+        newValue: null,
+      },
+    ]);
   });
 });
