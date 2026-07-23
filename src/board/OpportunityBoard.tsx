@@ -1,6 +1,4 @@
 import AddIcon from '@mui/icons-material/Add';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import {
   DndContext,
@@ -69,7 +67,6 @@ interface Props {
   role: Role;
   customOrder: Partial<Record<OpportunityStatus, string[]>>;
   onMove: (opportunity: Opportunity, status: OpportunityStatus) => void;
-  onReorder: (status: OpportunityStatus, id: string, offset: -1 | 1) => void;
   onReorderDrop: (
     status: OpportunityStatus,
     id: string,
@@ -78,7 +75,6 @@ interface Props {
   ) => void;
   managerAssigneeFilter: string;
   employeeMyWork: boolean;
-  controlsExpanded: boolean;
   onManagerAssigneeFilterChange: (value: string) => void;
   onEmployeeMyWorkChange: (value: boolean) => void;
 }
@@ -113,19 +109,11 @@ function DropColumn({
 function DraggableCard({
   item,
   highlighted,
-  role,
-  index,
-  count,
   onSelect,
-  onReorder,
 }: {
   item: Opportunity;
   highlighted: boolean;
-  role: Role;
-  index: number;
-  count: number;
   onSelect: Props['onSelect'];
-  onReorder: Props['onReorder'];
 }) {
   const {
     attributes,
@@ -165,26 +153,6 @@ function DraggableCard({
           >
             Move
           </Button>
-          {role === 'Manager' && (
-            <>
-              <Button
-                aria-label={`Move ${item.id} up`}
-                disabled={index === 0}
-                onClick={() => onReorder(item.status, item.id, -1)}
-                sx={{ minWidth: 44 }}
-              >
-                <ArrowUpwardIcon />
-              </Button>
-              <Button
-                aria-label={`Move ${item.id} down`}
-                disabled={index === count - 1}
-                onClick={() => onReorder(item.status, item.id, 1)}
-                sx={{ minWidth: 44 }}
-              >
-                <ArrowDownwardIcon />
-              </Button>
-            </>
-          )}
         </Stack>
         <Box
           component="button"
@@ -253,11 +221,9 @@ export function OpportunityBoard({
   role,
   customOrder,
   onMove,
-  onReorder,
   onReorderDrop,
   managerAssigneeFilter,
   employeeMyWork,
-  controlsExpanded,
   onManagerAssigneeFilterChange,
   onEmployeeMyWorkChange,
 }: Props) {
@@ -391,74 +357,72 @@ export function OpportunityBoard({
 
   return (
     <Stack spacing={3}>
-      {controlsExpanded && (
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-          <TextField
-            label="Search opportunities"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            sx={{ minWidth: { md: 320 } }}
-          />
-          <FormControl sx={{ minWidth: 180 }}>
-            <InputLabel id="priority-filter-label">Priority</InputLabel>
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+        <TextField
+          label="Search opportunities"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          sx={{ minWidth: { md: 320 } }}
+        />
+        <FormControl sx={{ minWidth: 180 }}>
+          <InputLabel id="priority-filter-label">Priority</InputLabel>
+          <Select
+            labelId="priority-filter-label"
+            label="Priority"
+            value={priority}
+            onChange={(event) => setPriority(event.target.value)}
+          >
+            {['All', 'High', 'Medium', 'Low'].map((value) => (
+              <MenuItem key={value} value={value}>
+                {value}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        {role === 'Manager' ? (
+          <FormControl sx={{ minWidth: 190 }}>
+            <InputLabel id="employee-filter-label">Employee</InputLabel>
             <Select
-              labelId="priority-filter-label"
-              label="Priority"
-              value={priority}
-              onChange={(event) => setPriority(event.target.value)}
+              labelId="employee-filter-label"
+              label="Employee"
+              value={managerAssigneeFilter}
+              onChange={(event) =>
+                onManagerAssigneeFilterChange(event.target.value)
+              }
             >
-              {['All', 'High', 'Medium', 'Low'].map((value) => (
+              {['All Employees', ...ASSIGNEES, 'Unassigned'].map((value) => (
                 <MenuItem key={value} value={value}>
                   {value}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          {role === 'Manager' ? (
-            <FormControl sx={{ minWidth: 190 }}>
-              <InputLabel id="employee-filter-label">Employee</InputLabel>
-              <Select
-                labelId="employee-filter-label"
-                label="Employee"
-                value={managerAssigneeFilter}
-                onChange={(event) =>
-                  onManagerAssigneeFilterChange(event.target.value)
-                }
-              >
-                {['All Employees', ...ASSIGNEES, 'Unassigned'].map((value) => (
-                  <MenuItem key={value} value={value}>
-                    {value}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          ) : (
-            <Button
-              variant={employeeMyWork ? 'contained' : 'outlined'}
-              aria-pressed={employeeMyWork}
-              onClick={() => {
-                if (employeeMyWork) {
-                  setQuery('');
-                  setPriority('All');
-                }
-                onEmployeeMyWorkChange(!employeeMyWork);
-              }}
-            >
-              {employeeMyWork ? 'Show All' : 'My Work'}
-            </Button>
-          )}
-          <Box sx={{ flexGrow: 1 }} />
-          {view === 'Active' && (
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setDialogOpen(true)}
-            >
-              New opportunity
-            </Button>
-          )}
-        </Stack>
-      )}
+        ) : (
+          <Button
+            variant={employeeMyWork ? 'contained' : 'outlined'}
+            aria-pressed={employeeMyWork}
+            onClick={() => {
+              if (employeeMyWork) {
+                setQuery('');
+                setPriority('All');
+              }
+              onEmployeeMyWorkChange(!employeeMyWork);
+            }}
+          >
+            {employeeMyWork ? 'Show All' : 'My Work'}
+          </Button>
+        )}
+        <Box sx={{ flexGrow: 1 }} />
+        {view === 'Active' && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setDialogOpen(true)}
+          >
+            New opportunity
+          </Button>
+        )}
+      </Stack>
 
       {opportunities.length === 0 && (
         <Alert severity="info">
@@ -529,16 +493,12 @@ export function OpportunityBoard({
                       No opportunities
                     </Typography>
                   )}
-                  {items.map((item, index) => (
+                  {items.map((item) => (
                     <DraggableCard
                       key={item.id}
                       item={item}
                       highlighted={item.id === highlightedId}
-                      role={role}
-                      index={index}
-                      count={items.length}
                       onSelect={onSelect}
-                      onReorder={onReorder}
                     />
                   ))}
                 </Stack>

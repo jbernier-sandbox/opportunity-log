@@ -143,7 +143,7 @@ describe('login and application shell', () => {
     await waitFor(() => expect(help).toHaveFocus());
   });
 
-  it('collapses to the approved compact header and exposes the selected view', async () => {
+  it('keeps header controls visible and exposes the selected view', async () => {
     render(<App />);
     const user = await login();
     await dismissWelcome(user);
@@ -159,22 +159,21 @@ describe('login and application shell', () => {
       screen.queryByRole('heading', { name: /active opportunities/i }),
     ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /^collapse$/i }));
     expect(screen.getByText('Opportunity Log')).toBeInTheDocument();
     expect(screen.getByText('Employee', { exact: true })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /enter fullscreen/i }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^expand$/i })).toHaveAttribute(
-      'aria-expanded',
-      'false',
-    );
     expect(
-      screen.queryByLabelText(/search opportunities/i),
+      screen.queryByRole('button', { name: /^collapse$/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /switch to manager/i }),
+      screen.queryByRole('button', { name: /^expand$/i }),
     ).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/search opportunities/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /switch to manager/i }),
+    ).toBeInTheDocument();
   });
 
   it('uses employee filter action labels and Show All clears employee filters', async () => {
@@ -388,6 +387,15 @@ describe('login and application shell', () => {
     );
     render(<App />);
     const user = userEvent.setup();
+    expect(
+      screen.getByRole('button', { name: /^move OPP-0001$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /move OPP-0001 up/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /move OPP-0001 down/i }),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /open OPP-0001/i }));
     await user.click(screen.getByRole('button', { name: /edit details/i }));
     await user.clear(screen.getByLabelText(/^title/i));

@@ -3,8 +3,6 @@ import CloseIcon from '@mui/icons-material/Close';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutlineOutlined';
 import FullscreenIcon from '@mui/icons-material/Fullscreen';
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import {
   Alert,
   AppBar,
@@ -117,7 +115,6 @@ export function App() {
   const [moveReason, setMoveReason] = useState('');
   const [moveError, setMoveError] = useState('');
   const [fullscreen, setFullscreen] = useState(false);
-  const [controlsExpanded, setControlsExpanded] = useState(true);
   const detailsOpener = useRef<HTMLElement | null>(null);
   const activeViewButton = useRef<HTMLButtonElement | null>(null);
   const closedViewButton = useRef<HTMLButtonElement | null>(null);
@@ -274,29 +271,6 @@ export function App() {
     }
   }
 
-  function reorderOpportunity(
-    status: OpportunityStatus,
-    id: string,
-    offset: -1 | 1,
-  ) {
-    const ids = orderOpportunities(
-      data.opportunities.filter((item) => item.status === status),
-      data.customOrder[status],
-    ).map((item) => item.id);
-    try {
-      const nextOrder = moveInCustomOrder(ids, id, offset, session.role);
-      persist({
-        ...data,
-        customOrder: { ...data.customOrder, [status]: nextOrder },
-      });
-      setFeedback('Card order updated.');
-    } catch (error) {
-      setFeedback(
-        error instanceof Error ? error.message : 'Ordering was not permitted.',
-      );
-    }
-  }
-
   function reorderOpportunityByDrop(
     status: OpportunityStatus,
     id: string,
@@ -433,7 +407,7 @@ export function App() {
                 </Button>
               </ButtonGroup>
               <Box sx={{ flexGrow: 1 }} />
-              {controlsExpanded && session.role === 'Manager' && (
+              {session.role === 'Manager' && (
                 <>
                   <Button color="inherit" onClick={loadSamples}>
                     Load sample data
@@ -447,32 +421,25 @@ export function App() {
                 </>
               )}
               <Stack spacing={0} sx={{ textAlign: 'right' }}>
-                {controlsExpanded && (
-                  <Typography variant="body2" sx={{ fontWeight: 800 }}>
-                    Alex Morgan
-                  </Typography>
-                )}
+                <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                  Alex Morgan
+                </Typography>
                 <Typography variant="caption">{session.role}</Typography>
               </Stack>
-              {controlsExpanded && (
-                <>
-                  <Button
-                    color="inherit"
-                    variant="outlined"
-                    onClick={() => setRoleDialog(true)}
-                  >
-                    Switch to{' '}
-                    {session.role === 'Employee' ? 'Manager' : 'Employee'}
-                  </Button>
-                  <IconButton
-                    color="inherit"
-                    aria-label="Help"
-                    onClick={() => setHelpOpen(true)}
-                  >
-                    <HelpOutlineIcon />
-                  </IconButton>
-                </>
-              )}
+              <Button
+                color="inherit"
+                variant="outlined"
+                onClick={() => setRoleDialog(true)}
+              >
+                Switch to {session.role === 'Employee' ? 'Manager' : 'Employee'}
+              </Button>
+              <IconButton
+                color="inherit"
+                aria-label="Help"
+                onClick={() => setHelpOpen(true)}
+              >
+                <HelpOutlineIcon />
+              </IconButton>
               <IconButton
                 color="inherit"
                 aria-label={fullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
@@ -480,21 +447,8 @@ export function App() {
               >
                 {fullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
               </IconButton>
-              {controlsExpanded && (
-                <Button color="inherit" onClick={logout}>
-                  Log out
-                </Button>
-              )}
-              <Button
-                color="inherit"
-                aria-expanded={controlsExpanded}
-                aria-controls="board-controls"
-                startIcon={
-                  controlsExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />
-                }
-                onClick={() => setControlsExpanded((expanded) => !expanded)}
-              >
-                {controlsExpanded ? 'Collapse' : 'Expand'}
+              <Button color="inherit" onClick={logout}>
+                Log out
               </Button>
             </Toolbar>
           </AppBar>
@@ -503,7 +457,7 @@ export function App() {
             maxWidth={false}
             sx={{ py: 2, px: { xs: 1, md: 2 } }}
           >
-            <Box id="board-controls" sx={{ mt: controlsExpanded ? 0 : 0.5 }}>
+            <Box id="board-controls">
               <OpportunityBoard
                 opportunities={data.opportunities}
                 view={view}
@@ -514,11 +468,9 @@ export function App() {
                 role={session.role}
                 customOrder={data.customOrder}
                 onMove={moveOpportunity}
-                onReorder={reorderOpportunity}
                 onReorderDrop={reorderOpportunityByDrop}
                 managerAssigneeFilter={data.preferences.managerAssigneeFilter}
                 employeeMyWork={data.preferences.employeeMyWork}
-                controlsExpanded={controlsExpanded}
                 onManagerAssigneeFilterChange={(managerAssigneeFilter) =>
                   persist({
                     ...data,
@@ -650,10 +602,9 @@ export function App() {
                   when all work is visible, My Work reapplies Alex's filter.
                   Show All also clears the other Employee filters. Manager mode
                   can filter by any employee or Unassigned. Each mode remembers
-                  its employee filter. Collapse the header controls to retain
-                  only Opportunity Log, Active/Closed, role, Fullscreen, and
-                  Expand. Use fullscreen again or press Escape to exit. Empty
-                  status columns remain visible.
+                  its employee filter. Header controls remain visible. Use
+                  fullscreen again or press Escape to exit. Empty status columns
+                  remain visible.
                 </Typography>
                 <Typography component="h3" variant="h6">
                   Notes and activity
