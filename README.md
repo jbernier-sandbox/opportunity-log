@@ -31,7 +31,7 @@ The persistent Help panel repeats the essential interaction guidance without lea
 
 - Active and Closed Kanban boards with counts, deterministic ordering, search, and priority filters
 - Manager employee filtering plus a separately remembered Employee My Work/Show All filter
-- Expanded-by-default controls that collapse to the title, view, role, fullscreen, and Expand actions
+- Persistent header and filter controls for predictable tablet access
 - Fullscreen mode for manufacturing-floor tablets, with Escape and header-toggle exit
 - Employee submission and self-assignment as Alex Morgan
 - Manager editing, assignment, reassignment, and workflow controls
@@ -76,7 +76,7 @@ The primary evaluation environment is a current Chrome or Edge browser on a 1920
 
 Selecting a card opens Details. Moving it requires the separate labelled handle, preventing tap-to-open and drag gestures from competing. The handle supports pointer and touch movement after an 8px activation threshold, plus Space, arrow keys, and Escape. Managers can also reorder within a column by drag or Up/Down controls. Rejected drops explain the permission or workflow rule and highlight the blocked card. Details always provides an equivalent non-drag workflow.
 
-The selected Active or Closed header button identifies the current board; separate board headings and the former authenticated subtitle are omitted to preserve vertical space. The controls default expanded and can collapse to a compact bar containing Opportunity Log, Active/Closed, the current role, Fullscreen, and Expand.
+The selected Active or Closed header button identifies the current board; separate board headings and the former authenticated subtitle are omitted to preserve vertical space. Header and filter controls remain visible without a collapse mode.
 
 In Employee mode, the filter button describes its next action: **Show All** while Alex's My Work filter is active and **My Work** while all cards are visible. Show All also clears the Employee search and priority filters.
 
