@@ -1,4 +1,5 @@
 import { createOpportunity } from '../domain/opportunity';
+import { OPPORTUNITY_STATUSES } from '../domain/opportunity';
 import { createInitialState } from '../persistence/appState';
 import {
   clearAllData,
@@ -29,6 +30,13 @@ describe('Phase 5 demo operations', () => {
       new Set(second.opportunities.map((item) => item.sampleKey)).size,
     ).toBeGreaterThan(1);
     expect(first.auditEvents.at(-1)?.action).toBe('sample_data_loaded');
+    for (const status of OPPORTUNITY_STATUSES) {
+      expect(
+        first.opportunities.filter(
+          (item) => item.status === status && item.sampleKey,
+        ),
+      ).toHaveLength(2);
+    }
   });
 
   it('keeps manager ordering deterministic and rejects employee ordering', () => {
