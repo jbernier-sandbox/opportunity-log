@@ -403,6 +403,12 @@ export function OpportunityDetails({
           Change status to {transition}?
         </DialogTitle>
         <DialogContent>
+          {opportunity.status === 'Assigned' && transition === 'New' && (
+            <Alert severity="warning" sx={{ mt: 1 }}>
+              The assigned user will be removed. This opportunity will be
+              updated to Unassigned and returned to New status.
+            </Alert>
+          )}
           {transition && requiresTransitionReason(transition) && (
             <TextField
               autoFocus
